@@ -35,63 +35,31 @@ func New(logger *slog.Logger, repo Repo, opts ...func(*Config)) App {
 		config: config,
 		logger: logger,
 		repo:   repo,
+		stack:  newStack(logger, config, repo),
 	}
 }
 
 type App interface {
+	http.Handler
 	Run(context.Context) error
-	Handler() http.Handler
 }
 
 type appImpl struct {
 	config *Config
 	logger *slog.Logger
 	repo   Repo
+	stack  http.Handler
 }
 
-func (app *appImpl) Handler() http.Handler {
-	router := http.NewServeMux()
-
-	// fs := http.FileServer(http.Dir(app.config.StaticFilesDir))
-	// router.Handle("/", fs)
-
-	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-	</head>
-	<body>
-		<div style="text-align: center; font-family: 'Roboto', -apple-system, 'Helvetica Neue', sans-serif;">
-			<H1>Welcome to the waitlist!</H1>
-		</div>
-	</body>
-</html>
-`))
-	})
-	router.HandleFunc("GET /api", NewAPIHandlerFunc(app.logger, app.repo))
-	router.HandleFunc("/webhook/{bot}", NewWebhookHandlerFunc(app.logger, &telegram.Parser{}, app.repo))
-
-	stack := middleware.CreateStack(
-		middleware.NewLogging(app.logger),
-	)
-
-	if len(app.config.TelegramApiSecretToken) > 0 {
-		stack = middleware.CreateStack(
-			stack,
-			middleware.NewAuth(app.config.TelegramApiSecretToken, app.logger),
-		)
-	}
-
-	return stack(router)
+func (app *appImpl) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	app.stack.ServeHTTP(w, r)
 }
 
 func (app *appImpl) Run(ctx context.Context) error {
 	addr := fmt.Sprintf(":%d", app.config.Port)
 	server := http.Server{
 		Addr:    addr,
-		Handler: app.Handler(),
+		Handler: app,
 	}
 
 	done := make(chan struct{})
@@ -113,4 +81,42 @@ func (app *appImpl) Run(ctx context.Context) error {
 		cancel()
 	}
 	return nil
+}
+
+func newStack(logger *slog.Logger, config *Config, repo Repo) http.Handler {
+	router := http.NewServeMux()
+
+	// fs := http.FileServer(http.Dir(app.config.StaticFilesDir))
+	// router.Handle("/", fs)
+
+	router.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+	</head>
+	<body>
+		<div style="text-align: center; font-family: 'Roboto', -apple-system, 'Helvetica Neue', sans-serif;">
+			<H1>Welcome to the waitlist!</H1>
+		</div>
+	</body>
+</html>
+`))
+	})
+	router.HandleFunc("GET /api", NewAPIHandlerFunc(logger, repo))
+	router.HandleFunc("POST /webhook/{bot}", NewWebhookHandlerFunc(logger, &telegram.Parser{}, repo))
+
+	stack := middleware.CreateStack(
+		middleware.NewLogging(logger),
+	)
+
+	if len(config.TelegramApiSecretToken) > 0 {
+		stack = middleware.CreateStack(
+			stack,
+			middleware.NewAuth(config.TelegramApiSecretToken, logger),
+		)
+	}
+
+	return stack(router)
 }

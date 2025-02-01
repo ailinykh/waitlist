@@ -8,12 +8,37 @@ import (
 	"net/http/httptest"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/ailinykh/waitlist/internal/api/telegram"
 	"github.com/ailinykh/waitlist/internal/app"
 	"github.com/ailinykh/waitlist/internal/repository"
 )
+
+func TestWebhookAcceptsOnlyPOSTMethod(t *testing.T) {
+	repo := repository.New(newDb(t))
+	handler := app.NewWebhookHandlerFunc(slog.Default(), &telegram.Parser{}, repo)
+
+	testHttpMethod := func(t testing.TB, method string, status int, body io.Reader) {
+		t.Helper()
+		request, _ := http.NewRequest(method, "/webhook/botusername", body)
+		response := httptest.NewRecorder()
+
+		handler.ServeHTTP(response, request)
+
+		if response.Code != status {
+			t.Errorf("expected %d but got %d", status, response.Code)
+		}
+	}
+
+	testHttpMethod(t, http.MethodGet, 405, nil)
+	testHttpMethod(t, http.MethodPatch, 405, nil)
+	testHttpMethod(t, http.MethodPut, 405, nil)
+	testHttpMethod(t, http.MethodDelete, 405, nil)
+	testHttpMethod(t, http.MethodPost, 400, strings.NewReader(""))
+	testHttpMethod(t, http.MethodPost, 200, strings.NewReader("{}"))
+}
 
 func TestWebhookSavesUserRequestInDatabase(t *testing.T) {
 	repo := repository.New(newDb(t))

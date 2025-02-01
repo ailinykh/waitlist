@@ -3,7 +3,6 @@ package app_test
 import (
 	"context"
 	"database/sql"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -20,29 +19,6 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 )
 
-func TestWebhookAcceptsOnlyPOSTMethod(t *testing.T) {
-	app, _ := makeSUT(t)
-
-	testHttpMethod := func(t testing.TB, method string, status int, body io.Reader) {
-		t.Helper()
-		request, _ := http.NewRequest(method, "/webhook/botusername", body)
-		response := httptest.NewRecorder()
-
-		app.Handler().ServeHTTP(response, request)
-
-		if response.Code != status {
-			t.Errorf("expected %d but got %d", status, response.Code)
-		}
-	}
-
-	testHttpMethod(t, http.MethodGet, 405, nil)
-	testHttpMethod(t, http.MethodPatch, 405, nil)
-	testHttpMethod(t, http.MethodPut, 405, nil)
-	testHttpMethod(t, http.MethodDelete, 405, nil)
-	testHttpMethod(t, http.MethodPost, 400, strings.NewReader(""))
-	testHttpMethod(t, http.MethodPost, 200, strings.NewReader("{}"))
-}
-
 func TestAuthHeader(t *testing.T) {
 	app, _ := makeSUT(t, app.WithTelegramApiSecretToken("secret"))
 
@@ -50,7 +26,7 @@ func TestAuthHeader(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodPost, "/webhook/botusername", strings.NewReader("{}"))
 		response := httptest.NewRecorder()
 
-		app.Handler().ServeHTTP(response, request)
+		app.ServeHTTP(response, request)
 
 		if response.Code != 403 {
 			t.Errorf("expected 403 but got %d", response.Code)
@@ -62,7 +38,7 @@ func TestAuthHeader(t *testing.T) {
 		request.Header.Set("X-Telegram-Bot-Api-Secret-Token", "secret")
 		response := httptest.NewRecorder()
 
-		app.Handler().ServeHTTP(response, request)
+		app.ServeHTTP(response, request)
 
 		if response.Code != 200 {
 			t.Errorf("expected 200 but got %d", response.Code)
@@ -77,7 +53,7 @@ func TestAppFrontend(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
 		response := httptest.NewRecorder()
 
-		app.Handler().ServeHTTP(response, request)
+		app.ServeHTTP(response, request)
 
 		if response.Code != 200 {
 			t.Errorf("expected 200 but got %d", response.Code)

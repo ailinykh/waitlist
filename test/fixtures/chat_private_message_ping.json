@@ -1,0 +1,24 @@
+{
+	"update_id": 424416098,
+	"message": {
+		"message_id": 350,
+		"from": {
+			"id": 12345,
+			"is_bot": false,
+			"first_name": "John",
+			"last_name": "Appleseed",
+			"username": "jappleseed",
+			"language_code": "en",
+			"is_premium": true
+		},
+		"chat": {
+			"id": 12345,
+			"first_name": "John",
+			"last_name": "Appleseed",
+			"username": "jappleseed",
+			"type": "private"
+		},
+		"date": 1737305359,
+		"text": "ping"
+	}
+}

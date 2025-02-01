@@ -20,7 +20,11 @@ func main() {
 	logger := slog.Default()
 	repo := repository.New(db(logger))
 
-	app := app.New(logger, repo)
+	app := app.New(
+		logger,
+		repo,
+		app.WithTelegramApiSecretToken(os.Getenv("TELEGRAM_BOT_API_SECRET_TOKEN")),
+	)
 	if err := app.Run(ctx); err != nil {
 		panic(err)
 	}

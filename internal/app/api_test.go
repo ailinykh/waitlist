@@ -18,5 +18,10 @@ func TestAPIGetEntries(t *testing.T) {
 		if response.Code != 200 {
 			t.Errorf("expected 200 but got %d", response.Code)
 		}
+
+		contentType := response.Header().Get("Content-Type")
+		if contentType != "application/json" {
+			t.Errorf("expected application/json but got %s", contentType)
+		}
 	})
 }

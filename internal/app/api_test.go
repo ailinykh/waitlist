@@ -10,7 +10,7 @@ func TestAPIGetEntries(t *testing.T) {
 	app, _ := makeSUT(t)
 
 	t.Run("it returns entries from the database", func(t *testing.T) {
-		request, _ := http.NewRequest(http.MethodGet, "/api", nil)
+		request := httptest.NewRequest(http.MethodGet, "/api", nil)
 		response := httptest.NewRecorder()
 
 		app.ServeHTTP(response, request)

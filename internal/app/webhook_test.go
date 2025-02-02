@@ -22,7 +22,7 @@ func TestWebhookAcceptsOnlyPOSTMethod(t *testing.T) {
 
 	testHttpMethod := func(t testing.TB, method string, status int, body io.Reader) {
 		t.Helper()
-		request, _ := http.NewRequest(method, "/webhook/botusername", body)
+		request := httptest.NewRequest(method, "/webhook/botusername", body)
 		response := httptest.NewRecorder()
 
 		handler.ServeHTTP(response, request)
@@ -46,7 +46,7 @@ func TestWebhookSavesUserRequestInDatabase(t *testing.T) {
 
 	t.Run("it saves user message in the database", func(t *testing.T) {
 		data := message(t, "chat_private_command_start")
-		request, _ := http.NewRequest(http.MethodPost, "/webhook/botusername", bytes.NewReader(data))
+		request := httptest.NewRequest(http.MethodPost, "/webhook/botusername", bytes.NewReader(data))
 		response := httptest.NewRecorder()
 
 		handler(response, request)
@@ -72,7 +72,7 @@ func TestWebhookSavesUserRequestInDatabase(t *testing.T) {
 	t.Run("it saves one more message in the database", func(t *testing.T) {
 		requestMessage := message(t, "chat_private_command_start")
 		responseMessage := message(t, "chat_private_command_start_response")
-		request, _ := http.NewRequest(http.MethodPost, "/webhook/botusername", bytes.NewReader(requestMessage))
+		request := httptest.NewRequest(http.MethodPost, "/webhook/botusername", bytes.NewReader(requestMessage))
 		response, data := perform(t, request, handler)
 
 		if response.Code != 200 {
@@ -102,7 +102,7 @@ func TestWebhookRespondsToPrivateMessage(t *testing.T) {
 
 	t.Run("it accepts different command fotmats and send's reply message", func(t *testing.T) {
 		testWith := func(t *testing.T, requestMessage []byte, responseMessage []byte) {
-			request, _ := http.NewRequest(http.MethodPost, "/webhook/botusername", bytes.NewReader(requestMessage))
+			request := httptest.NewRequest(http.MethodPost, "/webhook/botusername", bytes.NewReader(requestMessage))
 
 			response, data := perform(t, request, handler)
 

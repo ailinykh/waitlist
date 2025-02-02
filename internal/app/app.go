@@ -31,6 +31,8 @@ func New(logger *slog.Logger, repo Repo, opts ...func(*Config)) App {
 		opt(config)
 	}
 
+	logger.Info("creating app", slog.Any("config", config))
+
 	return &appImpl{
 		config: config,
 		logger: logger,
@@ -71,7 +73,7 @@ func (app *appImpl) Run(ctx context.Context) error {
 		close(done)
 	}()
 
-	app.logger.Info("Server listening", slog.String("addr", addr))
+	app.logger.Info("server listening", slog.String("addr", addr))
 	select {
 	case <-done:
 		break

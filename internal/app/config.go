@@ -6,26 +6,26 @@ import (
 )
 
 type Config struct {
-	Port                   int
-	TelegramApiSecretToken string
-	StaticFilesDir         string
+	port                   int
+	telegramApiSecretToken string
+	staticFilesDir         string
 }
 
 func WithPort(port int) func(*Config) {
 	return func(c *Config) {
-		c.Port = port
+		c.port = port
 	}
 }
 
 func WithTelegramApiSecretToken(token string) func(*Config) {
 	return func(c *Config) {
-		c.TelegramApiSecretToken = token
+		c.telegramApiSecretToken = token
 	}
 }
 
 func WithStaticFilesDir(dir string) func(*Config) {
 	return func(c *Config) {
-		c.StaticFilesDir = dir
+		c.staticFilesDir = dir
 	}
 }
 
@@ -37,8 +37,8 @@ func (c Config) LogValue() slog.Value {
 		return text[:2] + strings.Repeat("*", len(text)-4) + text[len(text)-2:]
 	}
 	return slog.GroupValue(
-		slog.Int("port", c.Port),
-		slog.String("bot_api_secret_token", safe(c.TelegramApiSecretToken)),
-		slog.String("static_files_dir", c.StaticFilesDir),
+		slog.Int("port", c.port),
+		slog.String("telegramApiSecretToken", safe(c.telegramApiSecretToken)),
+		slog.String("staticFilesDir", c.staticFilesDir),
 	)
 }

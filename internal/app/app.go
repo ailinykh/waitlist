@@ -22,9 +22,9 @@ type Repo interface {
 
 func New(logger *slog.Logger, repo Repo, opts ...func(*Config)) App {
 	config := &Config{
-		Port:                   8080,
-		TelegramApiSecretToken: "",
-		StaticFilesDir:         "web",
+		port:                   8080,
+		telegramApiSecretToken: "",
+		staticFilesDir:         "web",
 	}
 
 	for _, opt := range opts {
@@ -58,7 +58,7 @@ func (app *appImpl) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *appImpl) Run(ctx context.Context) error {
-	addr := fmt.Sprintf(":%d", app.config.Port)
+	addr := fmt.Sprintf(":%d", app.config.port)
 	server := http.Server{
 		Addr:    addr,
 		Handler: app,
@@ -110,13 +110,13 @@ func newStack(logger *slog.Logger, config *Config, repo Repo) http.Handler {
 	router.HandleFunc("POST /webhook/{bot}", NewWebhookHandlerFunc(logger, &telegram.Parser{}, repo))
 
 	stack := middleware.CreateStack(
-		middleware.NewLogging(logger),
+		middleware.Logging(logger),
 	)
 
-	if len(config.TelegramApiSecretToken) > 0 {
+	if len(config.telegramApiSecretToken) > 0 {
 		stack = middleware.CreateStack(
 			stack,
-			middleware.NewAuth(config.TelegramApiSecretToken, logger),
+			middleware.Auth(config.telegramApiSecretToken, logger),
 		)
 	}
 

@@ -36,12 +36,12 @@ func handleUpdate(r *http.Request, logger *slog.Logger, repo Repo) ([]byte, erro
 	}
 
 	if update.Message == nil {
-		logger.Info("ignoring non-message update", "id", update.ID)
+		logger.Info("ignoring non-message update", slog.Int("id", update.ID))
 		return nil, nil
 	}
 
 	if strings.TrimPrefix(update.Message.Text, "/") == "ping" {
-		logger.Info("ping message received", "id", update.ID)
+		logger.Info("ping message received", slog.Int("id", update.ID))
 		return telegram.NewResponse("sendMessage",
 			telegram.WithChatID(update.Message.Chat.ID),
 			telegram.WithText("pong"),
@@ -75,14 +75,14 @@ func NewWebhookHandlerFunc(logger *slog.Logger, parser *telegram.Parser, repo Re
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
-			logger.Error("only POST method allowed", "method", r.Method)
+			logger.Error("only POST method allowed", slog.String("method", r.Method))
 			return
 		}
 
 		update, err := parseUpdate(r, logger, parser)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			logger.Error("failed to parse upadte request", "error", err)
+			logger.Error("failed to parse upadte request", slog.Any("error", err))
 			return
 		}
 
@@ -91,7 +91,7 @@ func NewWebhookHandlerFunc(logger *slog.Logger, parser *telegram.Parser, repo Re
 		data, err := handleUpdate(req, logger, repo)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			logger.Error("failed to handle request", "error", err)
+			logger.Error("failed to handle request", slog.Any("error", err))
 			return
 		}
 

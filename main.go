@@ -30,7 +30,7 @@ func main() {
 	}
 
 	<-ctx.Done()
-	logger.Info("shoutdown app...")
+	logger.Info("shutdown app...")
 }
 
 //go:embed migrations/*.sql

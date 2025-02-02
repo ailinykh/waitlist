@@ -19,11 +19,11 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 )
 
-func TestAuthHeader(t *testing.T) {
+func TestAuthMiddlewareHeader(t *testing.T) {
 	app, _ := makeSUT(t, app.WithTelegramApiSecretToken("secret"))
 
 	t.Run("it blocks unauthorized requests", func(t *testing.T) {
-		request, _ := http.NewRequest(http.MethodPost, "/webhook/botusername", strings.NewReader("{}"))
+		request := httptest.NewRequest(http.MethodPost, "/webhook/botusername", strings.NewReader("{}"))
 		response := httptest.NewRecorder()
 
 		app.ServeHTTP(response, request)
@@ -34,8 +34,19 @@ func TestAuthHeader(t *testing.T) {
 	})
 
 	t.Run("it accepts authorized requests", func(t *testing.T) {
-		request, _ := http.NewRequest(http.MethodPost, "/webhook/botusername", strings.NewReader("{}"))
+		request := httptest.NewRequest(http.MethodPost, "/webhook/botusername", strings.NewReader("{}"))
 		request.Header.Set("X-Telegram-Bot-Api-Secret-Token", "secret")
+		response := httptest.NewRecorder()
+
+		app.ServeHTTP(response, request)
+
+		if response.Code != 200 {
+			t.Errorf("expected 200 but got %d", response.Code)
+		}
+	})
+
+	t.Run("it pases auth middleware for non-webhook requests", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodGet, "/", nil)
 		response := httptest.NewRecorder()
 
 		app.ServeHTTP(response, request)
@@ -50,7 +61,7 @@ func TestAppFrontend(t *testing.T) {
 	app, _ := makeSUT(t) // app.WithStaticFilesDir(filepath.Join(cwd(t), "web")),
 
 	t.Run("it returns HTML page", func(t *testing.T) {
-		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		request := httptest.NewRequest(http.MethodGet, "/", nil)
 		response := httptest.NewRecorder()
 
 		app.ServeHTTP(response, request)

@@ -107,18 +107,17 @@ func newStack(logger *slog.Logger, config *Config, repo Repo) http.Handler {
 `))
 	})
 	router.HandleFunc("GET /api", NewAPIHandlerFunc(logger, repo))
-	router.HandleFunc("POST /webhook/{bot}", NewWebhookHandlerFunc(logger, &telegram.Parser{}, repo))
+
+	router.Handle(
+		"POST /webhook/{bot}",
+		middleware.Auth(config.telegramApiSecretToken, logger)(
+			NewWebhookHandlerFunc(logger, &telegram.Parser{}, repo),
+		),
+	)
 
 	stack := middleware.CreateStack(
 		middleware.Logging(logger),
 	)
-
-	if len(config.telegramApiSecretToken) > 0 {
-		stack = middleware.CreateStack(
-			stack,
-			middleware.Auth(config.telegramApiSecretToken, logger),
-		)
-	}
 
 	return stack(router)
 }

@@ -28,7 +28,15 @@ func NewLogging(logger *slog.Logger) Middleware {
 
 			next.ServeHTTP(wrapped, r)
 
-			slog.Info("completed", "method", r.Method, "status", wrapped.statusCode, "path", r.URL.Path, "time", time.Since(start))
+			logger.Info(
+				"handled request",
+				slog.Int("statusCode", wrapped.statusCode),
+				slog.String("remoteAddr", r.RemoteAddr),
+				slog.String("xffHeader", r.Header.Get("X-Forwarded-For")),
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+				slog.Any("duration", time.Since(start)),
+			)
 		})
 	}
 }

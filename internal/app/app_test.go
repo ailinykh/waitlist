@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,66 +13,55 @@ import (
 	"github.com/ailinykh/waitlist/internal/app"
 	"github.com/ailinykh/waitlist/internal/database"
 	"github.com/ailinykh/waitlist/internal/repository"
+	h "github.com/ailinykh/waitlist/pkg/http_test"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 )
 
-func TestAuthMiddlewareHeader(t *testing.T) {
+func TestAuthMiddleware(t *testing.T) {
 	app, _ := makeSUT(t, app.WithTelegramApiSecretToken("secret"))
 
 	t.Run("it blocks unauthorized requests", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/webhook/botusername", strings.NewReader("{}"))
-		response := httptest.NewRecorder()
-
-		app.ServeHTTP(response, request)
-
-		if response.Code != 403 {
-			t.Errorf("expected 403 but got %d", response.Code)
-		}
+		h.Expect(t, app).Request(
+			h.WithUrl("/webhook/botusername"),
+			h.WithMethod(http.MethodPost),
+			h.WithData([]byte("{}")),
+		).ToRespond(
+			h.WithCode(http.StatusForbidden),
+		)
 	})
 
 	t.Run("it accepts authorized requests", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/webhook/botusername", strings.NewReader("{}"))
-		request.Header.Set("X-Telegram-Bot-Api-Secret-Token", "secret")
-		response := httptest.NewRecorder()
-
-		app.ServeHTTP(response, request)
-
-		if response.Code != 200 {
-			t.Errorf("expected 200 but got %d", response.Code)
-		}
+		h.Expect(t, app).Request(
+			h.WithUrl("/webhook/botusername"),
+			h.WithMethod(http.MethodPost),
+			h.WithHeader("X-Telegram-Bot-Api-Secret-Token", "secret"),
+			h.WithData([]byte("{}")),
+		).ToRespond(
+			h.WithCode(http.StatusOK),
+		)
 	})
 
 	t.Run("it pases auth middleware for non-webhook requests", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodGet, "/", nil)
-		response := httptest.NewRecorder()
-
-		app.ServeHTTP(response, request)
-
-		if response.Code != 200 {
-			t.Errorf("expected 200 but got %d", response.Code)
-		}
+		h.Expect(t, app).Request(
+			h.WithUrl("/"),
+		).ToRespond(
+			h.WithCode(http.StatusOK),
+		)
 	})
 }
 
 func TestAppFrontend(t *testing.T) {
 	app, _ := makeSUT(t) // app.WithStaticFilesDir(filepath.Join(cwd(t), "web")),
 
-	t.Run("it returns HTML page", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodGet, "/", nil)
-		response := httptest.NewRecorder()
-
-		app.ServeHTTP(response, request)
-
-		if response.Code != 200 {
-			t.Errorf("expected 200 but got %d", response.Code)
-		}
-
-		contentType := response.Header().Get("Content-Type")
-		if contentType != "text/html; charset=utf-8" {
-			t.Errorf("expected text/html; charset=utf-8 but got %s", contentType)
-		}
+	t.Run("it displays HTML page", func(t *testing.T) {
+		h.Expect(t, app).Request(
+			h.WithUrl("/"),
+		).ToRespond(
+			h.WithCode(200),
+			h.WithContentType("text/html; charset=utf-8"),
+		)
 	})
 }
 

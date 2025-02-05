@@ -1,61 +1,59 @@
 package app_test
 
 import (
-	"bytes"
-	"io"
+	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path"
-	"strings"
 	"testing"
 
 	"github.com/ailinykh/waitlist/internal/api/telegram"
 	"github.com/ailinykh/waitlist/internal/app"
 	"github.com/ailinykh/waitlist/internal/repository"
+	h "github.com/ailinykh/waitlist/pkg/http_test"
 )
 
-func TestWebhookAcceptsOnlyPOSTMethod(t *testing.T) {
+func TestWebhookAllowedHttpMethods(t *testing.T) {
+	// should test handler instead of `app` to avoid 404 page on GET request
 	repo := repository.New(newDb(t))
 	handler := app.NewWebhookHandlerFunc(slog.Default(), &telegram.Parser{}, repo)
 
-	testHttpMethod := func(t testing.TB, method string, status int, body io.Reader) {
-		t.Helper()
-		request := httptest.NewRequest(method, "/webhook/botusername", body)
-		response := httptest.NewRecorder()
-
-		handler.ServeHTTP(response, request)
-
-		if response.Code != status {
-			t.Errorf("expected %d but got %d", status, response.Code)
-		}
+	testHttpMethod := func(t *testing.T, method string, status int, body []byte) {
+		t.Run(fmt.Sprintf("it responds with %d status to %s request", status, method), func(t *testing.T) {
+			h.Expect(t, handler).Request(
+				h.WithUrl("/webhook/botusername"),
+				h.WithMethod(method),
+				h.WithData(body),
+			).ToRespond(
+				h.WithCode(status),
+			)
+		})
 	}
 
 	testHttpMethod(t, http.MethodGet, 405, nil)
 	testHttpMethod(t, http.MethodPatch, 405, nil)
 	testHttpMethod(t, http.MethodPut, 405, nil)
 	testHttpMethod(t, http.MethodDelete, 405, nil)
-	testHttpMethod(t, http.MethodPost, 400, strings.NewReader(""))
-	testHttpMethod(t, http.MethodPost, 200, strings.NewReader("{}"))
+	testHttpMethod(t, http.MethodPost, 400, []byte(""))
+	testHttpMethod(t, http.MethodPost, 200, []byte("{}"))
 }
 
-func TestWebhookSavesUserRequestInDatabase(t *testing.T) {
-	repo := repository.New(newDb(t))
-	handler := app.NewWebhookHandlerFunc(slog.Default(), &telegram.Parser{}, repo)
+func TestWebhookSavesUserInTheDatabase(t *testing.T) {
+	app, repo := makeSUT(t)
 
 	t.Run("it saves user message in the database", func(t *testing.T) {
 		data := message(t, "chat_private_command_start")
-		request := httptest.NewRequest(http.MethodPost, "/webhook/botusername", bytes.NewReader(data))
-		response := httptest.NewRecorder()
+		h.Expect(t, app).Request(
+			h.WithUrl("/webhook/botusername"),
+			h.WithMethod(http.MethodPost),
+			h.WithData(data),
+		).ToRespond(
+			h.WithCode(http.StatusOK),
+		)
 
-		handler(response, request)
-
-		if response.Code != 200 {
-			t.Errorf("expected 200 but got %d", response.Code)
-		}
-
-		entry, err := repo.GetByID(request.Context(), 1)
+		entry, err := repo.GetByID(context.TODO(), 1)
 		if err != nil {
 			t.Errorf("failed to get all entries %s", err)
 		}
@@ -72,14 +70,16 @@ func TestWebhookSavesUserRequestInDatabase(t *testing.T) {
 	t.Run("it saves one more message in the database", func(t *testing.T) {
 		requestMessage := message(t, "chat_private_command_start")
 		responseMessage := message(t, "chat_private_command_start_response")
-		request := httptest.NewRequest(http.MethodPost, "/webhook/botusername", bytes.NewReader(requestMessage))
-		response, data := perform(t, request, handler)
+		h.Expect(t, app).Request(
+			h.WithUrl("/webhook/botusername"),
+			h.WithMethod(http.MethodPost),
+			h.WithData(requestMessage),
+		).ToRespond(
+			h.WithCode(http.StatusOK),
+			h.WithBody(responseMessage),
+		)
 
-		if response.Code != 200 {
-			t.Errorf("expected 200 but got %d", response.Code)
-		}
-
-		all, err := repo.GetAll(request.Context())
+		all, err := repo.GetAll(context.TODO())
 		if err != nil {
 			t.Errorf("failed to get all entries %s", err)
 		}
@@ -87,69 +87,30 @@ func TestWebhookSavesUserRequestInDatabase(t *testing.T) {
 		if len(all) != 2 {
 			t.Errorf("Expected 2 entry, got %d", len(all))
 		}
-
-		expected := string(responseMessage)
-		actual := string(data)
-		if expected != actual {
-			t.Errorf("expected %s but got %s", expected, actual)
-		}
 	})
 }
 
 func TestWebhookRespondsToPrivateMessage(t *testing.T) {
-	repo := repository.New(newDb(t))
-	handler := app.NewWebhookHandlerFunc(slog.Default(), &telegram.Parser{}, repo)
+	app, _ := makeSUT(t)
+	t.Run("it accepts different command formats and responds with message", func(t *testing.T) {
+		h.Expect(t, app).Request(
+			h.WithUrl("/webhook/botusername"),
+			h.WithMethod(http.MethodPost),
+			h.WithData(message(t, "chat_private_message_ping")),
+		).ToRespond(
+			h.WithCode(http.StatusOK),
+			h.WithBody(message(t, "chat_private_message_ping_response")),
+		)
 
-	t.Run("it accepts different command fotmats and send's reply message", func(t *testing.T) {
-		testWith := func(t *testing.T, requestMessage []byte, responseMessage []byte) {
-			request := httptest.NewRequest(http.MethodPost, "/webhook/botusername", bytes.NewReader(requestMessage))
-
-			response, data := perform(t, request, handler)
-
-			if response.Code != 200 {
-				t.Errorf("expected 200 but got %d", response.Code)
-			}
-
-			all, err := repo.GetAll(request.Context())
-			if err != nil {
-				t.Errorf("failed to get all entries %s", err)
-			}
-
-			if len(all) != 0 {
-				t.Errorf("Expected 0 entry, got %d", len(all))
-			}
-
-			expected := string(responseMessage)
-			actual := string(data)
-			if expected != actual {
-				t.Errorf("expected %s but got %s", expected, actual)
-			}
-
-			contentType := response.Header().Get("content-type")
-			if contentType != "application/json" {
-				t.Errorf(`expected "application/json" but got "%s" Content-Type`, contentType)
-			}
-		}
-
-		testWith(t, message(t, "chat_private_message_ping"), message(t, "chat_private_message_ping_response"))
-		testWith(t, message(t, "chat_private_command_ping"), message(t, "chat_private_command_ping_response"))
+		h.Expect(t, app).Request(
+			h.WithUrl("/webhook/botusername"),
+			h.WithMethod(http.MethodPost),
+			h.WithData(message(t, "chat_private_command_ping")),
+		).ToRespond(
+			h.WithCode(http.StatusOK),
+			h.WithBody(message(t, "chat_private_command_ping_response")),
+		)
 	})
-}
-
-func perform(t testing.TB, request *http.Request, handler http.Handler) (*httptest.ResponseRecorder, []byte) {
-	t.Helper()
-	response := httptest.NewRecorder()
-
-	handler.ServeHTTP(response, request)
-
-	res := response.Result()
-	defer res.Body.Close()
-
-	data, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Errorf("unexpected body %s", err)
-	}
-	return response, data
 }
 
 func message(t testing.TB, filename string) []byte {

@@ -9,6 +9,7 @@ import (
 	"os/signal"
 
 	"github.com/ailinykh/waitlist/internal/app"
+	"github.com/ailinykh/waitlist/internal/clock"
 	"github.com/ailinykh/waitlist/internal/database"
 	"github.com/ailinykh/waitlist/internal/repository"
 )
@@ -23,7 +24,11 @@ func main() {
 	app := app.New(
 		logger,
 		repo,
+		clock.New(),
+		templates,
 		app.WithTelegramApiSecretToken(os.Getenv("TELEGRAM_BOT_API_SECRET_TOKEN")),
+		app.WithTelegramBotToken(os.Getenv("TELEGRAM_BOT_TOKEN")),
+		app.WithJwtSecret(os.Getenv("JWT_SECRET")),
 	)
 	if err := app.Run(ctx); err != nil {
 		panic(err)
@@ -35,6 +40,9 @@ func main() {
 
 //go:embed migrations/*.sql
 var migrations embed.FS
+
+//go:embed templates/*.html
+var templates embed.FS
 
 func db(logger *slog.Logger) *sql.DB {
 	db, err := database.New(logger,

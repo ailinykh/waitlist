@@ -35,12 +35,35 @@ func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (sql.R
 	)
 }
 
-const getAll = `-- name: GetAll :many
+const createUser = `-- name: CreateUser :execresult
+INSERT INTO users (user_id, first_name, last_name, username, photo_url, role, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, "user", now(), now())
+`
+
+type CreateUserParams struct {
+	UserID    int64  `json:"user_id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Username  string `json:"username"`
+	PhotoUrl  string `json:"photo_url"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createUser,
+		arg.UserID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Username,
+		arg.PhotoUrl,
+	)
+}
+
+const getAllEntries = `-- name: GetAllEntries :many
 SELECT id, user_id, first_name, last_name, username, bot_username, message, created_at, updated_at FROM waitlist
 `
 
-func (q *Queries) GetAll(ctx context.Context) ([]Waitlist, error) {
-	rows, err := q.db.QueryContext(ctx, getAll)
+func (q *Queries) GetAllEntries(ctx context.Context) ([]Waitlist, error) {
+	rows, err := q.db.QueryContext(ctx, getAllEntries)
 	if err != nil {
 		return nil, err
 	}
@@ -72,12 +95,49 @@ func (q *Queries) GetAll(ctx context.Context) ([]Waitlist, error) {
 	return items, nil
 }
 
-const getByID = `-- name: GetByID :one
+const getAllUsers = `-- name: GetAllUsers :many
+SELECT id, user_id, first_name, last_name, username, photo_url, role, created_at, updated_at FROM users
+`
+
+func (q *Queries) GetAllUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, getAllUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Username,
+			&i.PhotoUrl,
+			&i.Role,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getEntryByID = `-- name: GetEntryByID :one
 SELECT id, user_id, first_name, last_name, username, bot_username, message, created_at, updated_at FROM waitlist WHERE id = ?
 `
 
-func (q *Queries) GetByID(ctx context.Context, id uint64) (Waitlist, error) {
-	row := q.db.QueryRowContext(ctx, getByID, id)
+func (q *Queries) GetEntryByID(ctx context.Context, id uint64) (Waitlist, error) {
+	row := q.db.QueryRowContext(ctx, getEntryByID, id)
 	var i Waitlist
 	err := row.Scan(
 		&i.ID,
@@ -87,6 +147,27 @@ func (q *Queries) GetByID(ctx context.Context, id uint64) (Waitlist, error) {
 		&i.Username,
 		&i.BotUsername,
 		&i.Message,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByUserID = `-- name: GetUserByUserID :one
+SELECT id, user_id, first_name, last_name, username, photo_url, role, created_at, updated_at FROM users WHERE user_id = ?
+`
+
+func (q *Queries) GetUserByUserID(ctx context.Context, userID int64) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByUserID, userID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.FirstName,
+		&i.LastName,
+		&i.Username,
+		&i.PhotoUrl,
+		&i.Role,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

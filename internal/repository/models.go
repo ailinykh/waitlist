@@ -8,6 +8,18 @@ import (
 	"time"
 )
 
+type User struct {
+	ID        uint64    `json:"id"`
+	UserID    int64     `json:"user_id"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+	Username  string    `json:"username"`
+	PhotoUrl  string    `json:"photo_url"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type Waitlist struct {
 	ID          uint64    `json:"id"`
 	UserID      int64     `json:"user_id"`

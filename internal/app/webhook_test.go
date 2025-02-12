@@ -53,7 +53,7 @@ func TestWebhookSavesUserInTheDatabase(t *testing.T) {
 			h.WithCode(http.StatusOK),
 		)
 
-		entry, err := repo.GetByID(context.TODO(), 1)
+		entry, err := repo.GetEntryByID(context.TODO(), 1)
 		if err != nil {
 			t.Errorf("failed to get all entries %s", err)
 		}
@@ -79,7 +79,7 @@ func TestWebhookSavesUserInTheDatabase(t *testing.T) {
 			h.WithBody(responseMessage),
 		)
 
-		all, err := repo.GetAll(context.TODO())
+		all, err := repo.GetAllEntries(context.TODO())
 		if err != nil {
 			t.Errorf("failed to get all entries %s", err)
 		}

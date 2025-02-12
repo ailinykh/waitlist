@@ -55,6 +55,7 @@ func (r *request) ToRespond(opts ...func(*response)) {
 	expected := &response{
 		code:        http.StatusOK,
 		contentType: "",
+		cookies:     make(map[string]*string),
 	}
 	for _, opt := range opts {
 		opt(expected)
@@ -71,6 +72,24 @@ func (r *request) ToRespond(opts ...func(*response)) {
 
 	if response.Code != expected.code {
 		r.t.Errorf("expected %d but got %d", expected.code, response.Code)
+	}
+
+	if len(expected.cookies) > 0 {
+		cookies := response.Result().Cookies()
+		for k, v := range expected.cookies {
+			found := false
+			for _, c := range cookies {
+				if c.Name == k {
+					found = true
+					if v != nil && c.Value != *v {
+						r.t.Errorf("expected '%s' cookie to be: '%s', got '%s'", k, *v, c.Value)
+					}
+				}
+			}
+			if !found {
+				r.t.Errorf("expected set cookie: '%s' with value: '%s'", k, *v)
+			}
+		}
 	}
 
 	if len(expected.contentType) > 0 {

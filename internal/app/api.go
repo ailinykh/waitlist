@@ -8,10 +8,10 @@ import (
 
 func NewAPIHandlerFunc(logger *slog.Logger, repo Repo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		waitlist, err := repo.GetAll(r.Context())
+		waitlist, err := repo.GetAllEntries(r.Context())
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
 			logger.Error("failed to get waitlist", slog.Any("error", err))
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
 
@@ -19,8 +19,8 @@ func NewAPIHandlerFunc(logger *slog.Logger, repo Repo) http.HandlerFunc {
 
 		data, err := json.Marshal(waitlist)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
 			logger.Error("failed marshal waitlist", slog.Any("error", err))
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
 

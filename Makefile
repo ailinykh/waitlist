@@ -1,4 +1,7 @@
--include .env
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
 
 .PHONY: all serve kill run test build clean restart
 
@@ -12,7 +15,7 @@ before:
 	@echo "🛠 rebuilding an app..."
 
 serve: run
-	@fswatch -x -o --event Created --event Updated --event Renamed -r -e '.*' -i '\.go$$'  . | xargs -n1 -I{}  make restart || make kill
+	@fswatch -x -o --event Created --event Updated --event Renamed -r -e '.*' -i '[\.go|\.html]$$'  . | xargs -n1 -I{}  make restart || make kill
 
 $(APP): $(GO_FILES)
 	@go build $? -o $@

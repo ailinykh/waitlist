@@ -5,22 +5,28 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
+	"text/template"
 	"time"
 
 	"github.com/ailinykh/waitlist/internal/api/telegram"
+	"github.com/ailinykh/waitlist/internal/clock"
 	"github.com/ailinykh/waitlist/internal/middleware"
+
 	"github.com/ailinykh/waitlist/internal/repository"
 )
 
 type Repo interface {
-	GetAll(ctx context.Context) ([]repository.Waitlist, error)
-	GetByID(ctx context.Context, id uint64) (repository.Waitlist, error)
+	GetAllEntries(ctx context.Context) ([]repository.Waitlist, error)
+	GetEntryByID(ctx context.Context, id uint64) (repository.Waitlist, error)
 	CreateEntry(ctx context.Context, arg repository.CreateEntryParams) (sql.Result, error)
+	GetUserByUserID(ctx context.Context, userID int64) (repository.User, error)
+	CreateUser(ctx context.Context, arg repository.CreateUserParams) (sql.Result, error)
 }
 
-func New(logger *slog.Logger, repo Repo, opts ...func(*Config)) App {
+func New(logger *slog.Logger, repo Repo, clock clock.Clock, templates fs.FS, opts ...func(*Config)) App {
 	config := &Config{
 		port:                   8080,
 		telegramApiSecretToken: "",
@@ -33,11 +39,13 @@ func New(logger *slog.Logger, repo Repo, opts ...func(*Config)) App {
 
 	logger.Info("creating app", slog.Any("config", config))
 
+	tmpl := template.Must(template.New("").ParseFS(templates, "templates/*"))
+
 	return &appImpl{
 		config: config,
 		logger: logger,
 		repo:   repo,
-		stack:  newStack(logger, config, repo),
+		stack:  newStack(logger, config, repo, clock, tmpl),
 	}
 }
 
@@ -85,35 +93,63 @@ func (app *appImpl) Run(ctx context.Context) error {
 	return nil
 }
 
-func newStack(logger *slog.Logger, config *Config, repo Repo) http.Handler {
+func NewIndexHandlerFunc(repo Repo, tmpl *template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			w.WriteHeader(http.StatusNotFound)
+			tmpl.ExecuteTemplate(w, "error.html", struct {
+				Title       string
+				Description string
+			}{
+				Title:       "Page Not Found",
+				Description: "Sorry, we couldn’t find the page you’re looking for.",
+			})
+			return
+		}
+
+		entries, _ := repo.GetAllEntries(r.Context())
+
+		tmpl.ExecuteTemplate(w, "index.html", struct {
+			Entries []repository.Waitlist
+			Total   int
+		}{
+			Entries: entries,
+			Total:   len(entries),
+		})
+	}
+}
+
+func newStack(logger *slog.Logger, config *Config, repo Repo, clock clock.Clock, tmpl *template.Template) http.Handler {
 	router := http.NewServeMux()
 
 	// fs := http.FileServer(http.Dir(app.config.StaticFilesDir))
 	// router.Handle("/", fs)
 
-	router.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-	</head>
-	<body>
-		<div style="text-align: center; font-family: 'Roboto', -apple-system, 'Helvetica Neue', sans-serif;">
-			<H1>Welcome to the waitlist!</H1>
-		</div>
-	</body>
-</html>
-`))
-	})
-	router.HandleFunc("GET /api", NewAPIHandlerFunc(logger, repo))
+	bot, err := telegram.GetMe(config.telegramBotToken)
+	if err != nil {
+		panic(err)
+	}
+
+	router.HandleFunc("GET /login", NewLoginHandlerFunc(bot.Username, tmpl))
+	router.HandleFunc("GET /logout", NewLogutHandlerFunc())
+
+	router.HandleFunc("GET /api/telegram/callback", NewCallbackHandlerFunc(config, repo, clock, logger))
 
 	router.Handle(
 		"POST /webhook/{bot}",
-		middleware.Auth(config.telegramApiSecretToken, logger)(
+		middleware.HeaderAuth("X-Telegram-Bot-Api-Secret-Token", config.telegramApiSecretToken, logger)(
 			NewWebhookHandlerFunc(logger, &telegram.Parser{}, repo),
 		),
 	)
+
+	authStack := middleware.CreateStack(
+		middleware.JwtAuth(config.jwtSecret, middleware.User{}, clock, logger),
+		middleware.RoleAuth("admin", logger),
+	)
+
+	router.HandleFunc("/", http.NotFound)
+	router.Handle("GET /", authStack(NewIndexHandlerFunc(repo, tmpl)))
+	router.Handle("GET /api", authStack(NewAPIHandlerFunc(logger, repo)))
 
 	stack := middleware.CreateStack(
 		middleware.Logging(logger),

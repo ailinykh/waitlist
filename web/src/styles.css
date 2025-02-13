@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+
+@theme {
+	--color-clifford: #da373d;
+	--font-sans: 'Lucida Grande', 'Lucida Sans Unicode', Arial, Helvetica, Verdana;
+}

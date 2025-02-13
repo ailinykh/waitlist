@@ -13,29 +13,32 @@ import (
 func JwtAuth(jwtSecret string, contextKey any, clock clock.Clock, logger *slog.Logger) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if cookie, err := r.Cookie("auth"); err == nil {
-				claims, err := jwt.Decode(cookie.Value, jwtSecret)
-				if err != nil {
-					logger.Error("failed to parse jwt token", slog.Any("error", err))
-					http.Redirect(w, r, "/login", http.StatusFound)
-					return
-				}
-
-				ttl := int64(claims["ttl"].(float64))
-				if ttl < clock.Now().Unix() {
-					logger.Error("jwt expired", slog.Int64("ttl", ttl))
-					http.Redirect(w, r, "/logout", http.StatusFound)
-					return
-				}
-
-				logger.Info("got valid claims", slog.Any("claims", claims))
-
-				ctx := context.WithValue(r.Context(), contextKey, claims["payload"])
-				next.ServeHTTP(w, r.WithContext(ctx))
-			} else {
-				logger.Info("redirect", slog.String("path", r.URL.RawPath))
-				http.Redirect(w, r, "/login", http.StatusFound)
+			auth := r.Header.Get("Authorization")
+			if len(auth) < 7 {
+				logger.Error("no auth header passed", slog.String("authorization", auth))
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
 			}
+
+			logger.Info("got token", slog.String("auth", auth[7:]))
+			claims, err := jwt.Decode(auth[7:], jwtSecret)
+			if err != nil {
+				logger.Error("failed to parse jwt token", slog.Any("error", err))
+				http.Redirect(w, r, "/login", http.StatusFound)
+				return
+			}
+
+			ttl := int64(claims["ttl"].(float64))
+			if ttl < clock.Now().Unix() {
+				logger.Error("jwt expired", slog.Int64("ttl", ttl))
+				http.Redirect(w, r, "/logout", http.StatusFound)
+				return
+			}
+
+			logger.Info("got valid claims", slog.Any("claims", claims))
+
+			ctx := context.WithValue(r.Context(), contextKey, claims["payload"])
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }

@@ -44,7 +44,7 @@ func TestWebhookSavesUserInTheDatabase(t *testing.T) {
 	app, repo := makeSUT(t)
 
 	t.Run("it saves user message in the database", func(t *testing.T) {
-		data := message(t, "chat_private_command_start")
+		data := fixture(t, "chat_private_command_start")
 		h.Expect(t, app).Request(
 			h.WithUrl("/webhook/botusername"),
 			h.WithMethod(http.MethodPost),
@@ -68,8 +68,8 @@ func TestWebhookSavesUserInTheDatabase(t *testing.T) {
 	})
 
 	t.Run("it saves one more message in the database", func(t *testing.T) {
-		requestMessage := message(t, "chat_private_command_start")
-		responseMessage := message(t, "chat_private_command_start_response")
+		requestMessage := fixture(t, "chat_private_command_start")
+		responseMessage := fixture(t, "chat_private_command_start_response")
 		h.Expect(t, app).Request(
 			h.WithUrl("/webhook/botusername"),
 			h.WithMethod(http.MethodPost),
@@ -96,24 +96,24 @@ func TestWebhookRespondsToPrivateMessage(t *testing.T) {
 		h.Expect(t, app).Request(
 			h.WithUrl("/webhook/botusername"),
 			h.WithMethod(http.MethodPost),
-			h.WithData(message(t, "chat_private_message_ping")),
+			h.WithData(fixture(t, "chat_private_message_ping")),
 		).ToRespond(
 			h.WithCode(http.StatusOK),
-			h.WithBody(message(t, "chat_private_message_ping_response")),
+			h.WithBody(fixture(t, "chat_private_message_ping_response")),
 		)
 
 		h.Expect(t, app).Request(
 			h.WithUrl("/webhook/botusername"),
 			h.WithMethod(http.MethodPost),
-			h.WithData(message(t, "chat_private_command_ping")),
+			h.WithData(fixture(t, "chat_private_command_ping")),
 		).ToRespond(
 			h.WithCode(http.StatusOK),
-			h.WithBody(message(t, "chat_private_command_ping_response")),
+			h.WithBody(fixture(t, "chat_private_command_ping_response")),
 		)
 	})
 }
 
-func message(t testing.TB, filename string) []byte {
+func fixture(t testing.TB, filename string) []byte {
 	t.Helper()
 	filePath := path.Join(cwd(t), "test", "fixtures", filename+".json")
 	t.Logf("using fixture %s", filePath)

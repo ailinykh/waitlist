@@ -5,10 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"net/http"
-	"text/template"
 	"time"
 
 	"github.com/ailinykh/waitlist/internal/api/telegram"
@@ -26,11 +24,11 @@ type Repo interface {
 	CreateUser(ctx context.Context, arg repository.CreateUserParams) (sql.Result, error)
 }
 
-func New(logger *slog.Logger, repo Repo, clock clock.Clock, templates fs.FS, opts ...func(*Config)) App {
+func New(logger *slog.Logger, repo Repo, clock clock.Clock, opts ...func(*Config)) App {
 	config := &Config{
 		port:                   8080,
 		telegramApiSecretToken: "",
-		staticFilesDir:         "web",
+		staticFilesDir:         "web/build",
 	}
 
 	for _, opt := range opts {
@@ -39,13 +37,11 @@ func New(logger *slog.Logger, repo Repo, clock clock.Clock, templates fs.FS, opt
 
 	logger.Info("creating app", slog.Any("config", config))
 
-	tmpl := template.Must(template.New("").ParseFS(templates, "templates/*"))
-
 	return &appImpl{
 		config: config,
 		logger: logger,
 		repo:   repo,
-		stack:  newStack(logger, config, repo, clock, tmpl),
+		stack:  newStack(logger, config, repo, clock),
 	}
 }
 
@@ -93,47 +89,18 @@ func (app *appImpl) Run(ctx context.Context) error {
 	return nil
 }
 
-func NewIndexHandlerFunc(repo Repo, tmpl *template.Template) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			w.WriteHeader(http.StatusNotFound)
-			tmpl.ExecuteTemplate(w, "error.html", struct {
-				Title       string
-				Description string
-			}{
-				Title:       "Page Not Found",
-				Description: "Sorry, we couldn’t find the page you’re looking for.",
-			})
-			return
-		}
-
-		entries, _ := repo.GetAllEntries(r.Context())
-
-		tmpl.ExecuteTemplate(w, "index.html", struct {
-			Entries []repository.Waitlist
-			Total   int
-		}{
-			Entries: entries,
-			Total:   len(entries),
-		})
-	}
-}
-
-func newStack(logger *slog.Logger, config *Config, repo Repo, clock clock.Clock, tmpl *template.Template) http.Handler {
+func newStack(logger *slog.Logger, config *Config, repo Repo, clock clock.Clock) http.Handler {
 	router := http.NewServeMux()
 
-	// fs := http.FileServer(http.Dir(app.config.StaticFilesDir))
-	// router.Handle("/", fs)
+	fs := http.Dir(config.staticFilesDir)
+	router.Handle("/",
+		middleware.NewSPA(middleware.ServeFileContents("index.html", fs))(
+			http.FileServer(fs),
+		),
+	)
 
-	bot, err := telegram.GetMe(config.telegramBotToken)
-	if err != nil {
-		panic(err)
-	}
-
-	router.HandleFunc("GET /login", NewLoginHandlerFunc(bot.Username, tmpl))
-	router.HandleFunc("GET /logout", NewLogutHandlerFunc())
-
-	router.HandleFunc("GET /api/telegram/callback", NewCallbackHandlerFunc(config, repo, clock, logger))
+	router.HandleFunc("GET /api/telegram/oauth", NewOAuthHandlerFunc(config, logger))
+	router.HandleFunc("GET /api/telegram/oauth/token", NewCallbackHandlerFunc(config, repo, clock, logger))
 
 	router.Handle(
 		"POST /webhook/{bot}",
@@ -147,9 +114,7 @@ func newStack(logger *slog.Logger, config *Config, repo Repo, clock clock.Clock,
 		middleware.RoleAuth("admin", logger),
 	)
 
-	router.HandleFunc("/", http.NotFound)
-	router.Handle("GET /", authStack(NewIndexHandlerFunc(repo, tmpl)))
-	router.Handle("GET /api", authStack(NewAPIHandlerFunc(logger, repo)))
+	router.Handle("GET /api/entries", authStack(NewAPIHandlerFunc(logger, repo)))
 
 	stack := middleware.CreateStack(
 		middleware.Logging(logger),

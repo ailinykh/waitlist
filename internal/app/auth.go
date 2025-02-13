@@ -2,12 +2,11 @@ package app
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
-	"text/template"
 	"time"
 
 	"github.com/ailinykh/waitlist/internal/api/telegram"
@@ -17,15 +16,28 @@ import (
 	"github.com/ailinykh/waitlist/pkg/jwt"
 )
 
-func NewLoginHandlerFunc(bot string, tmpl *template.Template) http.HandlerFunc {
+func NewOAuthHandlerFunc(config *Config, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tmpl.ExecuteTemplate(w, "login.html", struct {
-			BotUsername string
-			URL         string
+		bot, err := telegram.GetMe(config.telegramBotToken)
+		if err != nil {
+			logger.Error("failed to get bot username", slog.Any("error", err))
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		data, err := json.Marshal(struct {
+			Username string `json:"username"`
 		}{
-			BotUsername: bot,
-			URL:         fmt.Sprintf("https://%s/api/telegram/callback", r.Host),
+			Username: bot.Username,
 		})
+		if err != nil {
+			logger.Error("failed to marshal response", slog.Any("error", err))
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Add("Content-Type", "application/json")
+		w.Write(data)
 	}
 }
 
@@ -111,15 +123,19 @@ func NewCallbackHandlerFunc(config *Config, repo Repo, clock clock.Clock, logger
 			return
 		}
 
-		cookie := &http.Cookie{
-			Name:     "auth",
-			Value:    tokenString,
-			Expires:  ttl,
-			Path:     "/",
-			Secure:   true,
-			HttpOnly: true, // can't be accessed by JavaScript
+		data, err := json.Marshal(struct {
+			Token string `json:"token"`
+		}{
+			Token: tokenString,
+		})
+		if err != nil {
+			logger.Error("failed to marshal response", slog.Any("error", err))
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
 		}
-		http.SetCookie(w, cookie)
-		http.Redirect(w, r, "/", http.StatusFound)
+
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Content-Type", "application/json")
+		w.Write(data)
 	}
 }

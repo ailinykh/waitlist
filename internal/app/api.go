@@ -17,14 +17,12 @@ func NewAPIHandlerFunc(logger *slog.Logger, repo Repo) http.HandlerFunc {
 
 		logger.Info("get all", slog.Int("count", len(waitlist)))
 
-		data, err := json.Marshal(waitlist)
-		if err != nil {
-			logger.Error("failed marshal waitlist", slog.Any("error", err))
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(data)
+
+		err = json.NewEncoder(w).Encode(waitlist)
+
+		if err != nil {
+			logger.Error("failed to encode waitlist", slog.Any("error", err))
+		}
 	}
 }

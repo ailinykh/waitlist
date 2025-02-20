@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -106,8 +107,9 @@ func (r *request) ToRespond(opts ...func(*response)) {
 		if err != nil {
 			r.t.Errorf("unexpected body %s", err)
 		}
-		if string(expected.body) != string(data) {
-			r.t.Errorf("expected %s but got %s", expected.body, data)
+		// `json.Encoder` writes some spaces and new line at the end
+		if string(expected.body) != strings.TrimSpace(string(data)) {
+			r.t.Errorf("expected '%s' but got '%s'", expected.body, data)
 		}
 	}
 }

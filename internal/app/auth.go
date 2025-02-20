@@ -25,19 +25,17 @@ func NewOAuthHandlerFunc(config *Config, logger *slog.Logger) http.HandlerFunc {
 			return
 		}
 
-		data, err := json.Marshal(struct {
+		w.Header().Add("Content-Type", "application/json")
+
+		err = json.NewEncoder(w).Encode(struct {
 			Username string `json:"username"`
 		}{
 			Username: bot.Username,
 		})
+
 		if err != nil {
 			logger.Error("failed to marshal response", slog.Any("error", err))
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
 		}
-
-		w.Header().Add("Content-Type", "application/json")
-		w.Write(data)
 	}
 }
 
@@ -123,19 +121,15 @@ func NewCallbackHandlerFunc(config *Config, repo Repo, clock clock.Clock, logger
 			return
 		}
 
-		data, err := json.Marshal(struct {
+		w.Header().Add("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(struct {
 			Token string `json:"token"`
 		}{
 			Token: tokenString,
 		})
+
 		if err != nil {
 			logger.Error("failed to marshal response", slog.Any("error", err))
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
 		}
-
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Add("Content-Type", "application/json")
-		w.Write(data)
 	}
 }

@@ -51,7 +51,9 @@ func TestJWTAuthorizationLogic(t *testing.T) {
 		app.WithTelegramBotToken("telegram-secret"),
 		app.WithStaticFilesDir(filepath.Join(cwd(t), "web/build")),
 		// RFC3339Nano "2006-01-02T15:04:05.999999999Z07:00"
-		clock.WithTime(clock.MustParse("2013-08-14T22:00:00.123456789Z")),
+		app.WithClock(
+			clock.New(clock.WithTime(clock.MustParse("2013-08-14T22:00:00.123456789Z"))),
+		),
 	)
 
 	t.Run("callback creates jwt token", func(t *testing.T) {
@@ -134,24 +136,9 @@ func newDb(t testing.TB) *sql.DB {
 	return db
 }
 
-func makeSUT(t testing.TB, opts ...interface{}) (app.App, app.Repo) {
+func makeSUT(t testing.TB, opts ...func(*app.Config)) (app.App, app.Repo) {
 	t.Helper()
 	repo := repository.New(newDb(t))
-
-	appOpts := []func(*app.Config){}
-	clockOpts := []func(*clock.ClockImpl){}
-
-	for _, opt := range opts {
-		switch v := opt.(type) {
-		case func(*app.Config):
-			appOpts = append(appOpts, v)
-		case func(*clock.ClockImpl):
-			clockOpts = append(clockOpts, v)
-		default:
-			t.Errorf("unexpected type %v", v)
-		}
-	}
-
-	app := app.New(slog.Default(), repo, clock.New(clockOpts...), appOpts...)
+	app := app.New(slog.Default(), repo, opts...)
 	return app, repo
 }

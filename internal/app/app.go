@@ -24,8 +24,9 @@ type Repo interface {
 	CreateUser(ctx context.Context, arg repository.CreateUserParams) (sql.Result, error)
 }
 
-func New(logger *slog.Logger, repo Repo, clock clock.Clock, opts ...func(*Config)) App {
+func New(logger *slog.Logger, repo Repo, opts ...func(*Config)) App {
 	config := &Config{
+		clock:                  clock.New(),
 		port:                   8080,
 		telegramApiSecretToken: "",
 		staticFilesDir:         "web/build",
@@ -41,7 +42,7 @@ func New(logger *slog.Logger, repo Repo, clock clock.Clock, opts ...func(*Config
 		config: config,
 		logger: logger,
 		repo:   repo,
-		stack:  newStack(logger, config, repo, clock),
+		stack:  newStack(logger, config, repo),
 	}
 }
 
@@ -89,7 +90,7 @@ func (app *appImpl) Run(ctx context.Context) error {
 	return nil
 }
 
-func newStack(logger *slog.Logger, config *Config, repo Repo, clock clock.Clock) http.Handler {
+func newStack(logger *slog.Logger, config *Config, repo Repo) http.Handler {
 	router := http.NewServeMux()
 
 	fs := http.Dir(config.staticFilesDir)
@@ -100,7 +101,7 @@ func newStack(logger *slog.Logger, config *Config, repo Repo, clock clock.Clock)
 	)
 
 	router.HandleFunc("GET /api/telegram/oauth", NewOAuthHandlerFunc(config, logger))
-	router.HandleFunc("GET /api/telegram/oauth/token", NewCallbackHandlerFunc(config, repo, clock, logger))
+	router.HandleFunc("GET /api/telegram/oauth/token", NewCallbackHandlerFunc(config, repo, config.clock, logger))
 
 	router.Handle(
 		"POST /webhook/{bot}",
@@ -110,7 +111,7 @@ func newStack(logger *slog.Logger, config *Config, repo Repo, clock clock.Clock)
 	)
 
 	authStack := middleware.CreateStack(
-		middleware.JwtAuth(config.jwtSecret, middleware.User{}, clock, logger),
+		middleware.JwtAuth(config.jwtSecret, middleware.User{}, config.clock, logger),
 		middleware.RoleAuth("admin", logger),
 	)
 

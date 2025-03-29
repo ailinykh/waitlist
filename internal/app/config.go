@@ -3,14 +3,23 @@ package app
 import (
 	"log/slog"
 	"strings"
+
+	"github.com/ailinykh/waitlist/internal/clock"
 )
 
 type Config struct {
+	clock                  clock.Clock
 	port                   int
 	telegramApiSecretToken string
 	telegramBotToken       string
 	jwtSecret              string
 	staticFilesDir         string
+}
+
+func WithClock(clock clock.Clock) func(*Config) {
+	return func(c *Config) {
+		c.clock = clock
+	}
 }
 
 func WithPort(port int) func(*Config) {

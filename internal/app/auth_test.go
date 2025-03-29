@@ -12,7 +12,9 @@ func TestLoginAPI(t *testing.T) {
 	app, _ := makeSUT(t,
 		app.WithJwtSecret("jwt-secret"),
 		// RFC3339Nano "2006-01-02T15:04:05.999999999Z07:00"
-		clock.WithTime(clock.MustParse("2013-08-14T22:00:00.123456789Z")),
+		app.WithClock(
+			clock.New(clock.WithTime(clock.MustParse("2013-08-14T22:00:00.123456789Z"))),
+		),
 	)
 
 	t.Run("it returns telegram oauth data", func(t *testing.T) {

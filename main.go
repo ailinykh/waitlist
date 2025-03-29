@@ -9,7 +9,6 @@ import (
 	"os/signal"
 
 	"github.com/ailinykh/waitlist/internal/app"
-	"github.com/ailinykh/waitlist/internal/clock"
 	"github.com/ailinykh/waitlist/internal/database"
 	"github.com/ailinykh/waitlist/internal/repository"
 )
@@ -24,7 +23,6 @@ func main() {
 	app := app.New(
 		logger,
 		repo,
-		clock.New(),
 		app.WithTelegramApiSecretToken(os.Getenv("TELEGRAM_BOT_API_SECRET_TOKEN")),
 		app.WithTelegramBotToken(os.Getenv("TELEGRAM_BOT_TOKEN")),
 		app.WithJwtSecret(os.Getenv("JWT_SECRET")),

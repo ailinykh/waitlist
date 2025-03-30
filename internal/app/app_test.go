@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/ailinykh/waitlist/internal/app"
@@ -103,8 +102,10 @@ func cwd(t testing.TB) string {
 		t.Error(err)
 	}
 
-	for !strings.HasSuffix(wd, "waitlist") {
+	_, err = os.Stat(filepath.Join(wd, "go.mod"))
+	for os.IsNotExist(err) {
 		wd = filepath.Dir(wd)
+		_, err = os.Stat(filepath.Join(wd, "go.mod"))
 	}
 	return wd
 }

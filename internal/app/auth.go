@@ -18,9 +18,10 @@ import (
 
 func NewOAuthHandlerFunc(config *Config, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		bot, err := telegram.GetMe(config.telegramBotToken)
+		bot := telegram.NewBot(config.telegramBotToken, config.telegramBotEndpoint)
+		botInfo, err := bot.GetMe()
 		if err != nil {
-			logger.Error("failed to get bot username", slog.Any("error", err))
+			logger.Error("failed to create bot", slog.Any("error", err))
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -30,7 +31,7 @@ func NewOAuthHandlerFunc(config *Config, logger *slog.Logger) http.HandlerFunc {
 		err = json.NewEncoder(w).Encode(struct {
 			Username string `json:"username"`
 		}{
-			Username: bot.Username,
+			Username: botInfo.Username,
 		})
 
 		if err != nil {

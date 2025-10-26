@@ -29,6 +29,7 @@ func New(logger *slog.Logger, repo Repo, opts ...func(*Config)) App {
 		clock:                  clock.New(),
 		port:                   8080,
 		telegramApiSecretToken: "",
+		telegramBotEndpoint:    "https://api.telegram.org",
 		staticFilesDir:         "web/build",
 	}
 

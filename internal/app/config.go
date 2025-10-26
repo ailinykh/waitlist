@@ -12,6 +12,7 @@ type Config struct {
 	port                   int
 	telegramApiSecretToken string
 	telegramBotToken       string
+	telegramBotEndpoint    string
 	jwtSecret              string
 	staticFilesDir         string
 }
@@ -37,6 +38,12 @@ func WithTelegramApiSecretToken(token string) func(*Config) {
 func WithTelegramBotToken(token string) func(*Config) {
 	return func(c *Config) {
 		c.telegramBotToken = token
+	}
+}
+
+func WithTelegramBotEndpoint(endpoint string) func(*Config) {
+	return func(c *Config) {
+		c.telegramBotEndpoint = endpoint
 	}
 }
 

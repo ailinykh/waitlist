@@ -18,7 +18,8 @@ import (
 func TestWebhookAllowedHttpMethods(t *testing.T) {
 	// should test handler instead of `app` to avoid 404 page on GET request
 	repo := repository.New(newDb(t))
-	handler := app.NewWebhookHandlerFunc(slog.Default(), &telegram.Parser{}, repo)
+	bot := telegram.NewBot("does not matter", "does not matter")
+	handler := app.NewWebhookHandlerFunc(slog.Default(), &telegram.Parser{}, bot, repo)
 
 	testHttpMethod := func(t *testing.T, method string, status int, body []byte) {
 		t.Run(fmt.Sprintf("it responds with %d status to %s request", status, method), func(t *testing.T) {
@@ -41,14 +42,20 @@ func TestWebhookAllowedHttpMethods(t *testing.T) {
 }
 
 func TestWebhookSavesUserInTheDatabase(t *testing.T) {
-	app, repo := makeSUT(t)
+	responses := []ResponseMock{
+		{Path: "/bot/sendMessage", Body: `{"result":{"chat_id":12345,"text":"This bot is not available in your region yet. Please come back later."}}`},
+		{Path: "/bot/sendMessage", Body: `{"result":{"chat_id":12345,"text":"This bot is not available in your region yet. Please come back later."}}`},
+	}
+	svr := makeServer(t, responses)
+	defer svr.Close()
+
+	app, repo := makeSUT(t, app.WithTelegramBotEndpoint(svr.URL))
 
 	t.Run("it saves user message in the database", func(t *testing.T) {
-		data := fixture(t, "chat_private_command_start")
 		h.Expect(t, app).Request(
 			h.WithUrl("/webhook/botusername"),
 			h.WithMethod(http.MethodPost),
-			h.WithData(data),
+			h.WithData(fixture(t, "chat_private_command_start")),
 		).ToRespond(
 			h.WithCode(http.StatusOK),
 		)
@@ -68,15 +75,12 @@ func TestWebhookSavesUserInTheDatabase(t *testing.T) {
 	})
 
 	t.Run("it saves one more message in the database", func(t *testing.T) {
-		requestMessage := fixture(t, "chat_private_command_start")
-		responseMessage := fixture(t, "chat_private_command_start_response")
 		h.Expect(t, app).Request(
 			h.WithUrl("/webhook/botusername"),
 			h.WithMethod(http.MethodPost),
-			h.WithData(requestMessage),
+			h.WithData(fixture(t, "chat_private_command_start")),
 		).ToRespond(
 			h.WithCode(http.StatusOK),
-			h.WithBody(responseMessage),
 		)
 
 		all, err := repo.GetAllEntries(context.TODO())
@@ -91,15 +95,22 @@ func TestWebhookSavesUserInTheDatabase(t *testing.T) {
 }
 
 func TestWebhookRespondsToPrivateMessage(t *testing.T) {
-	app, _ := makeSUT(t)
 	t.Run("it accepts different command formats and responds with message", func(t *testing.T) {
+		responses := []ResponseMock{
+			{Path: "/bot/sendMessage", Body: `{"result":{"chat_id":12345,"text":"pong"}}`},
+			{Path: "/bot/sendMessage", Body: `{"result":{"chat_id":12345,"text":"pong"}}`},
+		}
+		svr := makeServer(t, responses)
+		defer svr.Close()
+
+		app, _ := makeSUT(t, app.WithTelegramBotEndpoint(svr.URL))
+
 		h.Expect(t, app).Request(
 			h.WithUrl("/webhook/botusername"),
 			h.WithMethod(http.MethodPost),
 			h.WithData(fixture(t, "chat_private_message_ping")),
 		).ToRespond(
 			h.WithCode(http.StatusOK),
-			h.WithBody(fixture(t, "chat_private_message_ping_response")),
 		)
 
 		h.Expect(t, app).Request(
@@ -108,7 +119,6 @@ func TestWebhookRespondsToPrivateMessage(t *testing.T) {
 			h.WithData(fixture(t, "chat_private_command_ping")),
 		).ToRespond(
 			h.WithCode(http.StatusOK),
-			h.WithBody(fixture(t, "chat_private_command_ping_response")),
 		)
 	})
 }

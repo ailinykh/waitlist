@@ -16,9 +16,8 @@ import (
 	"github.com/ailinykh/waitlist/pkg/jwt"
 )
 
-func NewOAuthHandlerFunc(config *Config, logger *slog.Logger) http.HandlerFunc {
+func NewOAuthHandlerFunc(logger *slog.Logger, bot *telegram.Bot) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		bot := telegram.NewBot(config.telegramBotToken, config.telegramBotEndpoint)
 		botInfo, err := bot.GetMe()
 		if err != nil {
 			logger.Error("failed to create bot", slog.Any("error", err))

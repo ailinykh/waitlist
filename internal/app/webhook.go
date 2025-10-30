@@ -27,7 +27,7 @@ func parseUpdate(r *http.Request, _ *slog.Logger, parser *telegram.Parser) (*tel
 	return parser.Parse(data)
 }
 
-func handleUpdate(r *http.Request, logger *slog.Logger, repo Repo) ([]byte, error) {
+func handleUpdate(r *http.Request, logger *slog.Logger, repo Repo, bot *telegram.Bot) ([]byte, error) {
 	update := r.Context().Value(TelegramUpdateContextKey{}).(*telegram.Update)
 	if update == nil {
 		return nil, fmt.Errorf("no update in request context")
@@ -40,10 +40,8 @@ func handleUpdate(r *http.Request, logger *slog.Logger, repo Repo) ([]byte, erro
 
 	if strings.TrimPrefix(update.Message.Text, "/") == "ping" {
 		logger.Info("ping message received", slog.Int("id", update.ID))
-		return telegram.NewResponse("sendMessage",
-			telegram.WithChatID(update.Message.Chat.ID),
-			telegram.WithText("pong"),
-		).ToJSON()
+		_, err := bot.SendMessage(update.Message.Chat.ID, "pong")
+		return nil, err
 	}
 
 	arg := repository.CreateEntryParams{
@@ -60,16 +58,14 @@ func handleUpdate(r *http.Request, logger *slog.Logger, repo Repo) ([]byte, erro
 	}
 
 	if strings.HasPrefix(update.Message.Text, "/start") {
-		return telegram.NewResponse("sendMessage",
-			telegram.WithChatID(update.Message.Chat.ID),
-			telegram.WithText("This bot is not available in your region yet. Please come back later."),
-		).ToJSON()
+		_, err := bot.SendMessage(update.Message.Chat.ID, "This bot is not available in your region yet. Please come back later.")
+		return nil, err
 	}
 
 	return nil, nil
 }
 
-func NewWebhookHandlerFunc(logger *slog.Logger, parser *telegram.Parser, repo Repo) http.HandlerFunc {
+func NewWebhookHandlerFunc(logger *slog.Logger, parser *telegram.Parser, bot *telegram.Bot, repo Repo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			logger.Error("only POST method allowed", slog.String("method", r.Method))
@@ -86,7 +82,7 @@ func NewWebhookHandlerFunc(logger *slog.Logger, parser *telegram.Parser, repo Re
 
 		ctx := context.WithValue(r.Context(), TelegramUpdateContextKey{}, update)
 		req := r.WithContext(ctx)
-		data, err := handleUpdate(req, logger, repo)
+		data, err := handleUpdate(req, logger, repo, bot)
 		if err != nil {
 			logger.Error("failed to handle request", slog.Any("error", err))
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)

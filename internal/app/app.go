@@ -39,11 +39,13 @@ func New(logger *slog.Logger, repo Repo, opts ...func(*Config)) App {
 
 	logger.Info("creating app", slog.Any("config", config))
 
+	bot := telegram.NewBot(config.telegramBotToken, config.telegramBotEndpoint)
+
 	return &appImpl{
 		config: config,
 		logger: logger,
 		repo:   repo,
-		stack:  newStack(logger, config, repo),
+		stack:  newStack(logger, config, repo, bot),
 	}
 }
 
@@ -91,7 +93,7 @@ func (app *appImpl) Run(ctx context.Context) error {
 	return nil
 }
 
-func newStack(logger *slog.Logger, config *Config, repo Repo) http.Handler {
+func newStack(logger *slog.Logger, config *Config, repo Repo, bot *telegram.Bot) http.Handler {
 	router := http.NewServeMux()
 
 	fs := http.Dir(config.staticFilesDir)
@@ -101,13 +103,13 @@ func newStack(logger *slog.Logger, config *Config, repo Repo) http.Handler {
 		),
 	)
 
-	router.HandleFunc("GET /api/telegram/oauth", NewOAuthHandlerFunc(config, logger))
+	router.HandleFunc("GET /api/telegram/oauth", NewOAuthHandlerFunc(logger, bot))
 	router.HandleFunc("GET /api/telegram/oauth/token", NewCallbackHandlerFunc(config, repo, config.clock, logger))
 
 	router.Handle(
 		"POST /webhook/{bot}",
 		middleware.HeaderAuth("X-Telegram-Bot-Api-Secret-Token", config.telegramApiSecretToken, logger)(
-			NewWebhookHandlerFunc(logger, &telegram.Parser{}, repo),
+			NewWebhookHandlerFunc(logger, &telegram.Parser{}, bot, repo),
 		),
 	)
 

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -142,4 +143,29 @@ func makeSUT(t testing.TB, opts ...func(*app.Config)) (app.App, app.Repo) {
 	repo := repository.New(newDb(t))
 	app := app.New(slog.Default(), repo, opts...)
 	return app, repo
+}
+
+type ResponseMock struct {
+	Path string
+	Body string
+}
+
+func makeServer(t testing.TB, responses []ResponseMock) *httptest.Server {
+	requests := []string{}
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if len(requests) >= len(responses) {
+			t.Errorf("too many unexpected requests")
+		}
+
+		response := responses[len(requests)]
+		if r.URL.Path != response.Path {
+			t.Errorf("expected URL path: '%s', but got '%s'", response.Path, r.URL.Path)
+		}
+
+		requests = append(requests, r.URL.Path)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(response.Body))
+	}))
 }

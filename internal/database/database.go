@@ -67,7 +67,7 @@ func (conn *Connection) build() (*sql.DB, error) {
 
 		migrator, err := migrate.NewWithSourceInstance("iofs", source, conn.url)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create migration source: %s", err)
+			return nil, fmt.Errorf("failed to create migration source: %w", err)
 		}
 
 		if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {

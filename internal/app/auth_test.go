@@ -1,8 +1,6 @@
 package app_test
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/ailinykh/waitlist/internal/app"
@@ -11,14 +9,10 @@ import (
 )
 
 func TestLoginAPI(t *testing.T) {
-	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/bot0123456789:TeLeGRAMm_bot-T0keN/getMe" {
-			t.Errorf("Unexpected URL path: %s", r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"result":{"username":"waitlist_bot"}}`))
-	}))
+	responses := []ResponseMock{
+		{Path: "/bot0123456789:TeLeGRAMm_bot-T0keN/getMe", Body: `{"result":{"username":"waitlist_bot"}}`},
+	}
+	svr := makeServer(t, responses)
 	defer svr.Close()
 
 	app, _ := makeSUT(t,

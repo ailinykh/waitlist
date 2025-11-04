@@ -18,21 +18,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	replace := func(groups []string, a slog.Attr) slog.Attr {
-		if a.Key == slog.SourceKey {
-			source := a.Value.Any().(*slog.Source)
-			source.File = filepath.Base(source.File)
-			source.Function = filepath.Base(source.Function)
-		}
-		return a
-	}
-	opts := &slog.HandlerOptions{
-		Level:       slog.LevelDebug,
-		AddSource:   true,
-		ReplaceAttr: replace,
-	}
-
-	logger := slog.New(slog.NewTextHandler(os.Stderr, opts))
+	logger := NewLogger()
 	repo := repository.New(db(logger))
 
 	app := app.New(
@@ -62,4 +48,23 @@ func db(logger *slog.Logger) *sql.DB {
 		panic(err)
 	}
 	return db
+}
+
+func NewLogger() *slog.Logger {
+	opts := &slog.HandlerOptions{
+		Level:       slog.LevelDebug,
+		AddSource:   true,
+		ReplaceAttr: replaceAttr,
+	}
+
+	return slog.New(slog.NewTextHandler(os.Stderr, opts))
+}
+
+func replaceAttr(groups []string, a slog.Attr) slog.Attr {
+	if a.Key == slog.SourceKey {
+		source := a.Value.Any().(*slog.Source)
+		source.File = filepath.Base(source.File)
+		source.Function = filepath.Base(source.Function)
+	}
+	return a
 }

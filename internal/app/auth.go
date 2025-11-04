@@ -90,6 +90,8 @@ func NewCallbackHandlerFunc(config *Config, repo Repo, clock clock.Clock, logger
 				})
 				if err != nil {
 					logger.Error("failed to create user", slog.Any("error", err), slog.String("query", r.URL.RawQuery))
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
 				} else {
 					user, _ = repo.GetUserByUserID(r.Context(), userID)
 				}
@@ -105,7 +107,7 @@ func NewCallbackHandlerFunc(config *Config, repo Repo, clock clock.Clock, logger
 
 		tokenString, err := jwt.Encode(config.jwtSecret, map[string]interface{}{
 			"payload": middleware.User{
-								UserID:    user.UserID,
+				UserID:    user.UserID,
 				FirstName: user.FirstName,
 				LastName:  user.LastName,
 				Username:  user.Username,

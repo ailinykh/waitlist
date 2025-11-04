@@ -105,8 +105,7 @@ func NewCallbackHandlerFunc(config *Config, repo Repo, clock clock.Clock, logger
 
 		tokenString, err := jwt.Encode(config.jwtSecret, map[string]interface{}{
 			"payload": middleware.User{
-				ID:        user.ID,
-				UserID:    user.UserID,
+								UserID:    user.UserID,
 				FirstName: user.FirstName,
 				LastName:  user.LastName,
 				Username:  user.Username,

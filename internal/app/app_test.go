@@ -1,7 +1,6 @@
 package app_test
 
 import (
-	"context"
 	"database/sql"
 	"log/slog"
 	"net/http"
@@ -9,15 +8,16 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ailinykh/waitlist/internal/app"
 	"github.com/ailinykh/waitlist/internal/clock"
 	"github.com/ailinykh/waitlist/internal/database"
 	"github.com/ailinykh/waitlist/internal/repository"
 	h "github.com/ailinykh/waitlist/pkg/http_test"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/mysql"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 func TestXTokenAuthorizationLogic(t *testing.T) {
@@ -61,7 +61,7 @@ func TestJWTAuthorizationLogic(t *testing.T) {
 			h.WithUrl("/api/telegram/oauth/token?id=11&first_name=cat&last_name=person&username=ilovecats&photo_url=https%3A%2F%2Ft.me%2Fi%2Fuserpic%2F320%2Floh66&auth_date=1739115445&hash=1ff1e59e43a480fdc802bc0b42e3e68e80ce113ef099b459ee689a9e8a2870ca"),
 		).ToRespond(
 			h.WithCode(200),
-			h.WithBody([]byte(`{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXlsb2FkIjp7ImlkIjoxLCJ1c2VyX2lkIjoxMSwiZmlyc3RfbmFtZSI6ImNhdCIsImxhc3RfbmFtZSI6InBlcnNvbiIsInVzZXJuYW1lIjoiaWxvdmVjYXRzIiwicm9sZSI6InVzZXIifSwidHRsIjoxMzg1MTU3NjAwfQ.-GX5NOeqXMjp0uNCL34z1V64v9UvRZvCE4coae9Ftec"}`)),
+			h.WithBody([]byte(`{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXlsb2FkIjp7InVzZXJfaWQiOjExLCJmaXJzdF9uYW1lIjoiY2F0IiwibGFzdF9uYW1lIjoicGVyc29uIiwidXNlcm5hbWUiOiJpbG92ZWNhdHMiLCJyb2xlIjoidXNlciJ9LCJ0dGwiOjEzODUxNTc2MDB9.t76NSZmkry5vQcmDXNQgA2aw5KO40g3N07OSNKa2PkI"}`)),
 		)
 	})
 
@@ -113,27 +113,30 @@ func cwd(t testing.TB) string {
 
 func newDb(t testing.TB) *sql.DB {
 	t.Helper()
-	ctx := context.TODO()
-	mysqlContainer, err := mysql.Run(ctx,
-		"mysql:8.0.36",
-		mysql.WithDatabase("waitlist"),
+	postgresContainer, err := postgres.Run(t.Context(),
+		"postgres:18-alpine",
+		postgres.WithDatabase("waitlist"),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).WithStartupTimeout(5*time.Second)),
 	)
 	t.Cleanup(func() {
-		if err := testcontainers.TerminateContainer(mysqlContainer); err != nil {
+		if err := testcontainers.TerminateContainer(postgresContainer); err != nil {
 			t.Errorf("failed to terminate container: %s", err)
 		}
 	})
 	if err != nil {
-		t.Errorf("failed to start container: %s", err)
+		t.Fatalf("failed to start container: %s", err)
 	}
 
-	connectionString := mysqlContainer.MustConnectionString(ctx, "parseTime=true")
+	connectionString := postgresContainer.MustConnectionString(t.Context(), "sslmode=disable")
+
 	db, err := database.New(slog.Default(),
-		database.WithURL("mysql://"+connectionString),
+		database.WithURL(connectionString),
 		database.WithMigrations(os.DirFS(cwd(t))),
 	)
 	if err != nil {
-		t.Errorf("failed to open MYSQL connection: %s", err)
+		t.Fatalf("failed to open postgres connection: %s", err)
 	}
 	return db
 }

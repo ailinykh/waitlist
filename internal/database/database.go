@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
-	"strings"
+	"os"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/mysql"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
@@ -28,7 +28,7 @@ func WithMigrations(migrations fs.FS) func(*Connection) {
 
 func New(logger *slog.Logger, opts ...func(*Connection)) (*sql.DB, error) {
 	conn := &Connection{
-		url:        "mysql://root:password@/waitlist?parseTime=true",
+		url:        os.Getenv("DATABASE_URL"),
 		logger:     logger,
 		migrations: nil,
 	}
@@ -47,8 +47,7 @@ type Connection struct {
 }
 
 func (conn *Connection) build() (*sql.DB, error) {
-	url := strings.TrimPrefix(conn.url, "mysql://")
-	db, err := sql.Open("mysql", url)
+	db, err := sql.Open("postgres", conn.url)
 	if err != nil {
 		return nil, err
 	}

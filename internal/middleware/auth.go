@@ -84,7 +84,6 @@ func RoleAuth(role string, logger *slog.Logger) Middleware {
 }
 
 type User struct {
-	ID        uint64 `json:"id"`
 	UserID    int64  `json:"user_id"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
@@ -94,12 +93,7 @@ type User struct {
 
 func DecodeUser(dict map[string]interface{}) (*User, error) {
 	var user = &User{}
-	// FIXME: claims type mapping
-	if v, ok := dict["id"].(float64); ok {
-		user.ID = uint64(v)
-	} else {
-		return nil, fmt.Errorf("failed to parse ID")
-	}
+
 	// FIXME: claims type mapping
 	if v, ok := dict["user_id"].(float64); ok {
 		user.UserID = int64(v)

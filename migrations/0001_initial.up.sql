@@ -1,11 +1,11 @@
 CREATE TABLE IF NOT EXISTS waitlist (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
   user_id BIGINT NOT NULL,
-  first_name VARCHAR(255) NOT NULL,
-  last_name VARCHAR(255) NOT NULL,
-  username VARCHAR(255) NOT NULL,
-  bot_username VARCHAR(255) NOT NULL,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  username TEXT NOT NULL,
+  bot_username TEXT NOT NULL,
   message TEXT NOT NULL,
-  created_at DATETIME NOT NULL,
-  updated_at DATETIME NOT NULL
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );

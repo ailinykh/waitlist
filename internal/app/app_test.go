@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/ailinykh/waitlist/internal/app"
 	"github.com/ailinykh/waitlist/internal/clock"
@@ -17,7 +16,6 @@ import (
 	h "github.com/ailinykh/waitlist/pkg/http_test"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 func TestXTokenAuthorizationLogic(t *testing.T) {
@@ -116,9 +114,7 @@ func newDb(t testing.TB) *sql.DB {
 	postgresContainer, err := postgres.Run(t.Context(),
 		"postgres:18-alpine",
 		postgres.WithDatabase("waitlist"),
-		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).WithStartupTimeout(5*time.Second)),
+		postgres.BasicWaitStrategies(),
 	)
 	t.Cleanup(func() {
 		if err := testcontainers.TerminateContainer(postgresContainer); err != nil {

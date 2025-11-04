@@ -126,6 +126,7 @@ func newDb(t testing.TB) *sql.DB {
 	}
 
 	connectionString := postgresContainer.MustConnectionString(t.Context(), "sslmode=disable")
+	t.Logf("using connection %s", connectionString)
 
 	db, err := database.New(slog.Default(),
 		database.WithURL(connectionString),

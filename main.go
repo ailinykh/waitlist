@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 
 	"github.com/ailinykh/waitlist/internal/app"
 	"github.com/ailinykh/waitlist/internal/database"
@@ -17,7 +18,21 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	logger := slog.Default()
+	replace := func(groups []string, a slog.Attr) slog.Attr {
+		if a.Key == slog.SourceKey {
+			source := a.Value.Any().(*slog.Source)
+			source.File = filepath.Base(source.File)
+			source.Function = filepath.Base(source.Function)
+		}
+		return a
+	}
+	opts := &slog.HandlerOptions{
+		Level:       slog.LevelDebug,
+		AddSource:   true,
+		ReplaceAttr: replace,
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, opts))
 	repo := repository.New(db(logger))
 
 	app := app.New(

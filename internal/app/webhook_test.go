@@ -1,7 +1,6 @@
 package app_test
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -60,17 +59,21 @@ func TestWebhookSavesUserInTheDatabase(t *testing.T) {
 			h.WithCode(http.StatusOK),
 		)
 
-		entry, err := repo.GetEntryByID(context.TODO(), 1)
+		entries, err := repo.GetAllEntries(t.Context())
 		if err != nil {
-			t.Errorf("failed to get all entries %s", err)
+			t.Fatalf("failed to get all entries %s", err)
 		}
 
-		if entry.Username != "jappleseed" {
-			t.Errorf("Unexpected username %s", entry.Username)
+		if len(entries) != 1 {
+			t.Fatalf("expected single entry but got %d", len(entries))
 		}
 
-		if entry.Message != "/start" {
-			t.Errorf("Unexpected message %s", entry.Message)
+		if entries[0].Username != "jappleseed" {
+			t.Errorf("Unexpected username %s", entries[0].Username)
+		}
+
+		if entries[0].Message != "/start" {
+			t.Errorf("Unexpected message %s", entries[0].Message)
 		}
 	})
 
@@ -83,9 +86,9 @@ func TestWebhookSavesUserInTheDatabase(t *testing.T) {
 			h.WithCode(http.StatusOK),
 		)
 
-		all, err := repo.GetAllEntries(context.TODO())
+		all, err := repo.GetAllEntries(t.Context())
 		if err != nil {
-			t.Errorf("failed to get all entries %s", err)
+			t.Fatalf("failed to get all entries %s", err)
 		}
 
 		if len(all) != 2 {

@@ -18,7 +18,6 @@ import (
 
 type Repo interface {
 	GetAllEntries(ctx context.Context) ([]repository.Waitlist, error)
-	GetEntryByID(ctx context.Context, id uint64) (repository.Waitlist, error)
 	CreateEntry(ctx context.Context, arg repository.CreateEntryParams) (sql.Result, error)
 	GetUserByUserID(ctx context.Context, userID int64) (repository.User, error)
 	CreateUser(ctx context.Context, arg repository.CreateUserParams) (sql.Result, error)

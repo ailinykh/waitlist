@@ -1,0 +1,97 @@
+- method: GET
+  path: /botToken:1234/getMe
+  response:
+    status: 200
+    json: '{"ok": true, "result":{"username":"waitlist_bot"}}'
+- method: GET
+  path: /botToken:1234/getUpdates
+  response:
+    status: 200
+    json: |
+      {
+        "ok": true,
+        "result": [
+            {
+                "update_id": 424416092,
+                "message": {
+                    "message_id": 348,
+                    "from": {
+                        "id": 12345,
+                        "is_bot": false,
+                        "first_name": "John",
+                        "last_name": "Appleseed",
+                        "username": "jappleseed",
+                        "language_code": "en",
+                        "is_premium": true
+                    },
+                    "chat": {
+                        "id": 12345,
+                        "first_name": "John",
+                        "last_name": "Appleseed",
+                        "username": "jappleseed",
+                        "type": "private"
+                    },
+                    "date": 1737305359,
+                    "text": "/start",
+                    "entities": [
+                        {
+                            "offset": 0,
+                            "length": 6,
+                            "type": "bot_command"
+                        }
+                    ]
+                }
+            }
+        ]
+      }
+- method: POST
+  path: /botToken:1234/sendMessage
+  response:
+    status: 200
+    json: '{"result":{"chat_id":12345,"text":"This bot is not available in your region yet. Please come back later."}}'
+- method: GET
+  path: /botToken:1234/getUpdates
+  response:
+    status: 200
+    json: |
+      {
+        "ok": true,
+        "result": [
+            {
+                "update_id": 424416092,
+                "message": {
+                    "message_id": 348,
+                    "from": {
+                        "id": 12345,
+                        "is_bot": false,
+                        "first_name": "John",
+                        "last_name": "Appleseed",
+                        "username": "jappleseed",
+                        "language_code": "en",
+                        "is_premium": true
+                    },
+                    "chat": {
+                        "id": 12345,
+                        "first_name": "John",
+                        "last_name": "Appleseed",
+                        "username": "jappleseed",
+                        "type": "private"
+                    },
+                    "date": 1737305359,
+                    "text": "/start",
+                    "entities": [
+                        {
+                            "offset": 0,
+                            "length": 6,
+                            "type": "bot_command"
+                        }
+                    ]
+                }
+            }
+        ]
+      }
+- method: POST
+  path: /botToken:1234/sendMessage
+  response:
+    status: 200
+    json: '{"result":{"chat_id":12345,"text":"This bot is not available in your region yet. Please come back later."}}'

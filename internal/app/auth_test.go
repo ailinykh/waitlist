@@ -9,12 +9,7 @@ import (
 )
 
 func TestLoginAPI(t *testing.T) {
-	responses := []ResponseMock{
-		{Path: "/bot0123456789:TeLeGRAMm_bot-T0keN/getMe", Body: `{"result":{"username":"waitlist_bot"}}`},
-	}
-	svr := makeServer(t, responses)
-	defer svr.Close()
-
+	svr := makeServerMock(t, "test_login_api")
 	app, _ := makeSUT(t,
 		app.WithJwtSecret("jwt-secret"),
 		app.WithTelegramBotToken("0123456789:TeLeGRAMm_bot-T0keN"),

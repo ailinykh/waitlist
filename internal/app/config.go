@@ -8,13 +8,12 @@ import (
 )
 
 type Config struct {
-	clock                  clock.Clock
-	port                   int
-	telegramApiSecretToken string
-	telegramBotToken       string
-	telegramBotEndpoint    string
-	jwtSecret              string
-	staticFilesDir         string
+	clock               clock.Clock
+	port                int
+	telegramBotToken    string
+	telegramBotEndpoint string
+	jwtSecret           string
+	staticFilesDir      string
 }
 
 func WithClock(clock clock.Clock) func(*Config) {
@@ -26,12 +25,6 @@ func WithClock(clock clock.Clock) func(*Config) {
 func WithPort(port int) func(*Config) {
 	return func(c *Config) {
 		c.port = port
-	}
-}
-
-func WithTelegramApiSecretToken(token string) func(*Config) {
-	return func(c *Config) {
-		c.telegramApiSecretToken = token
 	}
 }
 
@@ -68,7 +61,6 @@ func (c Config) LogValue() slog.Value {
 	}
 	return slog.GroupValue(
 		slog.Int("port", c.port),
-		slog.String("telegramApiSecretToken", safe(c.telegramApiSecretToken)),
 		slog.String("telegramBotToken", safe(c.telegramBotToken)),
 		slog.String("jwtSecret", safe(c.jwtSecret)),
 		slog.String("staticFilesDir", c.staticFilesDir),

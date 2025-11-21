@@ -2,10 +2,12 @@ package app_test
 
 import (
 	"database/sql"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -16,37 +18,15 @@ import (
 	h "github.com/ailinykh/waitlist/pkg/http_test"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"gopkg.in/yaml.v3"
 )
 
-func TestXTokenAuthorizationLogic(t *testing.T) {
-	app, _ := makeSUT(t, app.WithTelegramApiSecretToken("secret"))
-
-	t.Run("it blocks x-token unauthorized requests", func(t *testing.T) {
-		h.Expect(t, app).Request(
-			h.WithUrl("/webhook/botusername"),
-			h.WithMethod(http.MethodPost),
-			h.WithData([]byte("{}")),
-		).ToRespond(
-			h.WithCode(403),
-		)
-	})
-
-	t.Run("it accepts x-token authorized requests", func(t *testing.T) {
-		h.Expect(t, app).Request(
-			h.WithUrl("/webhook/botusername"),
-			h.WithMethod(http.MethodPost),
-			h.WithHeader("X-Telegram-Bot-Api-Secret-Token", "secret"),
-			h.WithData([]byte("{}")),
-		).ToRespond(
-			h.WithCode(200),
-		)
-	})
-}
-
 func TestJWTAuthorizationLogic(t *testing.T) {
+	svr := makeServerMock(t, "test_jwt_authorization_logic")
 	app, _ := makeSUT(t,
 		app.WithJwtSecret("jwt-secret"),
 		app.WithTelegramBotToken("telegram-secret"),
+		app.WithTelegramBotEndpoint(svr.URL),
 		app.WithStaticFilesDir(filepath.Join(cwd(t), "web/build")),
 		// RFC3339Nano "2006-01-02T15:04:05.999999999Z07:00"
 		app.WithClock(
@@ -73,7 +53,8 @@ func TestJWTAuthorizationLogic(t *testing.T) {
 }
 
 func TestAppFrontend(t *testing.T) {
-	app, _ := makeSUT(t, app.WithStaticFilesDir(filepath.Join(cwd(t), "web/build")))
+	svr := makeServerMock(t, "test_app_frontend")
+	app, _ := makeSUT(t, app.WithTelegramBotEndpoint(svr.URL), app.WithStaticFilesDir(filepath.Join(cwd(t), "web/build")))
 
 	t.Run("it does not require authorization for spa", func(t *testing.T) {
 		h.Expect(t, app).Request(
@@ -141,31 +122,63 @@ func newDb(t testing.TB) *sql.DB {
 func makeSUT(t testing.TB, opts ...func(*app.Config)) (app.App, app.Repo) {
 	t.Helper()
 	repo := repository.New(newDb(t))
-	app := app.New(slog.Default(), repo, opts...)
+	app, err := app.New(slog.Default(), repo, opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return app, repo
 }
 
-type ResponseMock struct {
-	Path string
-	Body string
-}
+func makeServerMock(t testing.TB, fixtureName string) *httptest.Server {
+	t.Helper()
+	t.Logf("using fixture: %s.yml for %s", fixtureName, t.Name())
 
-func makeServer(t testing.TB, responses []ResponseMock) *httptest.Server {
-	requests := []string{}
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if len(requests) >= len(responses) {
-			t.Errorf("too many unexpected requests")
+	filePath := path.Join(cwd(t), "test", "fixtures", fixtureName+".yml")
+	yamlFile, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("Error reading YAML file: %v", err)
+	}
+
+	var requests []struct {
+		Method   string `yaml:"method"`
+		Path     string `yaml:"path"`
+		Response struct {
+			Status int    `yaml:"status"`
+			Json   string `yaml:"json"`
+		} `yaml:"response"`
+	}
+	err = yaml.Unmarshal(yamlFile, &requests)
+	if err != nil {
+		t.Fatalf("Error unmarshaling YAML data: %v", err)
+	}
+
+	idx := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if idx >= len(requests) {
+			t.Fatalf("unexpected request %s", r.URL.Path)
 		}
 
-		response := responses[len(requests)]
-		if r.URL.Path != response.Path {
-			t.Errorf("expected URL path: '%s', but got '%s'", response.Path, r.URL.Path)
+		req := requests[idx]
+
+		if req.Method != r.Method {
+			t.Fatalf("expected method: %s but got %s", req.Method, r.Method)
 		}
 
-		requests = append(requests, r.URL.Path)
+		if req.Path != r.URL.Path {
+			t.Fatalf("expected path: %s but got %s", req.Path, r.URL.Path)
+		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response.Body))
+		w.WriteHeader(req.Response.Status)
+		_, err := io.WriteString(w, req.Response.Json)
+		if err != nil {
+			t.Fatal(err)
+		}
+		idx += 1
 	}))
+
+	t.Cleanup(func() {
+		server.Close()
+	})
+
+	return server
 }

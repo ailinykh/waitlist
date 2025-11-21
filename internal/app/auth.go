@@ -16,21 +16,14 @@ import (
 	"github.com/ailinykh/waitlist/pkg/jwt"
 )
 
-func NewOAuthHandlerFunc(logger *slog.Logger, bot *telegram.Bot) http.HandlerFunc {
+func NewOAuthHandlerFunc(logger *slog.Logger, username string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		botInfo, err := bot.GetMe()
-		if err != nil {
-			logger.Error("failed to create bot", slog.Any("error", err))
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-
 		w.Header().Add("Content-Type", "application/json")
 
-		err = json.NewEncoder(w).Encode(struct {
+		err := json.NewEncoder(w).Encode(struct {
 			Username string `json:"username"`
 		}{
-			Username: botInfo.Username,
+			Username: username,
 		})
 
 		if err != nil {

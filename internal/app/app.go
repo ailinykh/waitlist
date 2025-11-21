@@ -23,13 +23,12 @@ type Repo interface {
 	CreateUser(ctx context.Context, arg repository.CreateUserParams) (sql.Result, error)
 }
 
-func New(logger *slog.Logger, repo Repo, opts ...func(*Config)) App {
+func New(logger *slog.Logger, repo Repo, opts ...func(*Config)) (App, error) {
 	config := &Config{
-		clock:                  clock.New(),
-		port:                   8080,
-		telegramApiSecretToken: "",
-		telegramBotEndpoint:    "https://api.telegram.org",
-		staticFilesDir:         "web/build",
+		clock:               clock.New(),
+		port:                8080,
+		telegramBotEndpoint: "https://api.telegram.org",
+		staticFilesDir:      "web/build",
 	}
 
 	for _, opt := range opts {
@@ -38,14 +37,18 @@ func New(logger *slog.Logger, repo Repo, opts ...func(*Config)) App {
 
 	logger.Info("creating app", slog.Any("config", config))
 
-	bot := telegram.NewBot(config.telegramBotToken, config.telegramBotEndpoint)
+	bot, err := telegram.NewBot(config.telegramBotToken, config.telegramBotEndpoint, logger)
+	if err != nil {
+		logger.Error("failed to create bot", "error", err)
+		return nil, err
+	}
 
 	return &appImpl{
 		config: config,
 		logger: logger,
 		repo:   repo,
-		stack:  newStack(logger, config, repo, bot),
-	}
+		stack:  newStack(logger, config, repo, bot.Username),
+	}, nil
 }
 
 type App interface {
@@ -92,7 +95,7 @@ func (app *appImpl) Run(ctx context.Context) error {
 	return nil
 }
 
-func newStack(logger *slog.Logger, config *Config, repo Repo, bot *telegram.Bot) http.Handler {
+func newStack(logger *slog.Logger, config *Config, repo Repo, username string) http.Handler {
 	router := http.NewServeMux()
 
 	fs := http.Dir(config.staticFilesDir)
@@ -102,15 +105,8 @@ func newStack(logger *slog.Logger, config *Config, repo Repo, bot *telegram.Bot)
 		),
 	)
 
-	router.HandleFunc("GET /api/telegram/oauth", NewOAuthHandlerFunc(logger, bot))
+	router.HandleFunc("GET /api/telegram/oauth", NewOAuthHandlerFunc(logger, username))
 	router.HandleFunc("GET /api/telegram/oauth/token", NewCallbackHandlerFunc(config, repo, config.clock, logger))
-
-	router.Handle(
-		"POST /webhook/{bot}",
-		middleware.HeaderAuth("X-Telegram-Bot-Api-Secret-Token", config.telegramApiSecretToken, logger)(
-			NewWebhookHandlerFunc(logger, &telegram.Parser{}, bot, repo),
-		),
-	)
 
 	authStack := middleware.CreateStack(
 		middleware.JwtAuth(config.jwtSecret, middleware.User{}, config.clock, logger),

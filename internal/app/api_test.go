@@ -9,8 +9,10 @@ import (
 )
 
 func TestAPIGetEntries(t *testing.T) {
+	svr := makeServerMock(t, "test_app_frontend")
 	app, _ := makeSUT(t,
 		app.WithJwtSecret("jwt-secret"),
+		app.WithTelegramBotEndpoint(svr.URL),
 		// RFC3339Nano "2006-01-02T15:04:05.999999999Z07:00"
 		app.WithClock(
 			clock.New(clock.WithTime(clock.MustParse("2013-08-14T23:00:00.123456789Z"))),

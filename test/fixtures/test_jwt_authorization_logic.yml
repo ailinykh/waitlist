@@ -1,0 +1,5 @@
+- method: GET
+  path: /bottelegram-secret/getMe
+  response:
+    status: 200
+    json: '{"ok": true, "result":{"username":"waitlist_bot"}}'

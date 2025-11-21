@@ -8,32 +8,69 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
+	"sync"
 
+	"github.com/ailinykh/waitlist/internal/api/telegram"
 	"github.com/ailinykh/waitlist/internal/app"
 	"github.com/ailinykh/waitlist/internal/database"
 	"github.com/ailinykh/waitlist/internal/repository"
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer cancel()
 
 	logger := NewLogger()
 	repo := repository.New(db(logger))
 
-	app := app.New(
+	server, err := app.New(
 		logger,
 		repo,
-		app.WithTelegramApiSecretToken(os.Getenv("TELEGRAM_BOT_API_SECRET_TOKEN")),
 		app.WithTelegramBotToken(os.Getenv("TELEGRAM_BOT_TOKEN")),
 		app.WithJwtSecret(os.Getenv("JWT_SECRET")),
 	)
-	if err := app.Run(ctx); err != nil {
+
+	if err != nil {
 		panic(err)
+	}
+	var wg sync.WaitGroup
+
+	wg.Go(func() {
+		if err := server.Run(ctx); err != nil {
+			panic(err)
+		}
+	})
+
+	for _, t := range parseTokens() {
+		wg.Go(func() {
+			bot, err := telegram.NewBot(t, "https://api.telegram.org", logger)
+			if err != nil {
+				logger.Error("failed to create waitlist", "error", err)
+				return
+			}
+
+			waitlist := app.NewWaitlist(bot, repo, logger.With("username", bot.Username))
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					err = waitlist.Run(ctx)
+					if err != nil {
+						logger.Error("failed to run", "username", bot.Username, "error", err)
+						return
+					}
+				}
+			}
+		})
 	}
 
 	<-ctx.Done()
-	logger.Info("shutdown app...")
+	logger.Info("attempt to shutdown gracefully...")
+
+	wg.Wait()
 }
 
 //go:embed migrations/*.sql
@@ -48,6 +85,18 @@ func db(logger *slog.Logger) *sql.DB {
 		panic(err)
 	}
 	return db
+}
+
+func parseTokens() []string {
+	tokens := []string{}
+	for _, env := range os.Environ() {
+		if idx := strings.Index(env, "="); idx > 0 {
+			if strings.HasPrefix(env[:idx], "TELEGRAM_BOT_TOKEN") {
+				tokens = append(tokens, env[idx+1:])
+			}
+		}
+	}
+	return tokens
 }
 
 func NewLogger() *slog.Logger {

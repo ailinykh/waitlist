@@ -1,0 +1,5 @@
+- method: GET
+  path: /bot0123456789:TeLeGRAMm_bot-T0keN/getMe
+  response:
+    status: 200
+    json: '{"ok": true, "result":{"username":"waitlist_bot"}}'

@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -22,9 +22,7 @@ func ParseDataCheckString(values url.Values) string {
 		}
 	}
 
-	sort.Slice(pairs, func(i, j int) bool {
-		return pairs[i] < pairs[j]
-	})
+	slices.Sort(pairs)
 
 	return strings.Join(pairs, "\n")
 }

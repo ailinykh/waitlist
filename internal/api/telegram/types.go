@@ -1,7 +1,7 @@
 package telegram
 
 type Update struct {
-	ID      int      `json:"update_id"`
+	ID      int64    `json:"update_id"`
 	Message *Message `json:"message,omitempty"`
 }
 
